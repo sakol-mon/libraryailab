@@ -2,9 +2,11 @@
 
 import { motion } from "framer-motion";
 import { Loader2, Menu, RefreshCw, Search, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import logoImage from "@/image/logo.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatTopicLabel, mergeWorkshopCatalog, type TopicStatus, type WorkshopRecord } from "@/lib/workshops";
 
@@ -179,8 +181,18 @@ export default function AttendeesPage() {
         ].join(" ")}
       >
         <div className="section-shell flex h-20 items-center justify-between">
-          <Link href="/" className="focus-ring rounded-full px-3 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home page">
-            LIBRARY AI LAB
+          <Link href="/" className="focus-ring flex items-center gap-3 rounded-full px-3 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home page">
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl sm:h-40 sm:w-40">
+              <Image
+                src={logoImage}
+                alt="LIBRARY AI LAB logo"
+                width={220}
+                height={220}
+                sizes="(max-width: 640px) 128px, 160px"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <span className="hidden sm:inline">LIBRARY AI LAB</span>
           </Link>
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary navigation">
@@ -304,6 +316,7 @@ export default function AttendeesPage() {
                   <table className="w-full border-collapse text-left">
                     <thead className="bg-white/8 text-sm text-zinc-300">
                       <tr>
+                        <th className="w-16 px-6 py-4 font-semibold">#</th>
                         <th className="px-6 py-4 font-semibold">ชื่อ</th>
                         <th className="px-6 py-4 font-semibold">หัวข้อที่สมัคร</th>
                       </tr>
@@ -317,6 +330,7 @@ export default function AttendeesPage() {
                           transition={{ duration: 0.25, delay: Math.min(index * 0.02, 0.2) }}
                           className="border-t border-white/10 text-white hover:bg-white/5"
                         >
+                          <td className="px-6 py-4 align-top text-zinc-400">{index + 1}</td>
                           <td className="px-6 py-4 align-top font-medium">{attendee.full_name}</td>
                           <td className="px-6 py-4 align-top text-zinc-200">{attendee.topicLabel}</td>
                         </motion.tr>

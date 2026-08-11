@@ -20,6 +20,7 @@ services:
       CHOKIDAR_INTERVAL: "1000"
       WATCHPACK_POLLING: "true"
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL is required}
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?NEXT_PUBLIC_SUPABASE_ANON_KEY is required}
 
     command: npm run dev -- --webpack

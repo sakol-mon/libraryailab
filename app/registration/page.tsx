@@ -2,9 +2,11 @@
 
 import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
+import logoImage from "@/image/logo.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatWorkshopDate, mergeWorkshopCatalog, type WorkshopRecord } from "@/lib/workshops";
 
@@ -230,8 +232,18 @@ export default function RegistrationPage() {
         ].join(" ")}
       >
         <div className="section-shell flex h-20 items-center justify-between">
-          <Link href="/" className="focus-ring rounded-full px-3 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home section">
-            LIBRARY AI LAB
+          <Link href="/" className="focus-ring flex items-center gap-3 rounded-full px-3 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home section">
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl sm:h-40 sm:w-40">
+              <Image
+                src={logoImage}
+                alt="LIBRARY AI LAB logo"
+                width={220}
+                height={220}
+                sizes="(max-width: 640px) 128px, 160px"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <span className="hidden sm:inline">LIBRARY AI LAB</span>
           </Link>
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary navigation">

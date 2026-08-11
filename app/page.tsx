@@ -2,15 +2,20 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  BookOpen,
   BrainCircuit,
   CalendarDays,
   ChevronRight,
   Clock3,
   Cpu,
   GraduationCap,
+  Globe2,
   Handshake,
+  Mail,
   MapPin,
   Menu,
+  Phone,
+  Printer,
   ScanLine,
   Sparkles,
   UserRound,
@@ -25,6 +30,7 @@ import speakerImage1 from "@/image/1.png";
 import speakerImage2 from "@/image/2.png";
 import speakerImage3 from "@/image/3.png";
 import speakerImage4 from "@/image/4.png";
+import logoImage from "@/image/logo.png";
 import posterImage from "@/image/poster.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -404,9 +410,20 @@ export default function Home() {
           scrolled ? "bg-[#061B4D]/65 backdrop-blur-xl border-b border-white/10" : "bg-transparent",
         )}
       >
-        <div className="section-shell flex h-20 items-center justify-between">
-          <a href="#home" className="focus-ring rounded-full px-3 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home section">
-            LIBRARY AI LAB
+        <div className="section-shell flex h-20 items-center justify-between gap-3">
+          <a href="#home" className="focus-ring flex items-center gap-3 rounded-full px-2 py-2 text-sm font-semibold tracking-[0.2em] text-white" aria-label="Go to home section">
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl sm:h-40 sm:w-40">
+              <Image
+                src={logoImage}
+                alt="LIBRARY AI LAB logo"
+                width={220}
+                height={220}
+                sizes="(max-width: 640px) 128px, 160px"
+                className="h-full w-full object-contain"
+                priority
+              />
+            </div>
+            <span className="hidden sm:inline">LIBRARY AI LAB</span>
           </a>
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary navigation">
             {navLinks.map((item) => (
@@ -582,12 +599,13 @@ export default function Home() {
                   transition={{ delay: index * 0.07, duration: 0.5 }}
                   whileHover={{ y: -8, scale: 1.02 }}
                 >
-                  <div className="mx-auto aspect-square w-full overflow-hidden rounded-full border border-[#43D5FF]/40 shadow-[0_0_36px_rgba(67,213,255,0.5)]">
+                  <div className="mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-full border border-[#43D5FF]/40 shadow-[0_0_36px_rgba(67,213,255,0.5)] sm:max-w-[240px] lg:max-w-[280px]">
                     <Image
                       src={speaker.image}
                       alt={speaker.name}
                       width={600}
                       height={600}
+                      sizes="(max-width: 640px) 72vw, (max-width: 1024px) 40vw, 20vw"
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -847,15 +865,47 @@ export default function Home() {
       </AnimatePresence>
 
       <footer id="contact" className="border-t border-white/10 bg-black/35 py-12">
-        <div className="section-shell grid gap-10 md:grid-cols-2">
+        <div className="section-shell grid gap-8 lg:grid-cols-[1.1fr_0.9fr_0.8fr] lg:items-start">
           <div>
-            <p className="text-sm tracking-[0.2em] text-[#56A6FF]\">สอบถามรายละเอียดเพิ่มเติม</p>
+            <div className="flex items-center gap-2 text-xl font-semibold text-white">
+              <BookOpen size={20} className="text-[#56A6FF]" />
+              <h3>หอสมุดและคลังความรู้มหาวิทยาลัยมหิดล</h3>
+            </div>
+            <div className="mt-4 space-y-3 text-sm leading-relaxed text-zinc-300">
+              <p className="pl-6">25/25 หมู่ 5 ถนนพุทธมณฑลสาย 4 ตำบลศาลายา</p>
+              <p className="pl-6">อำเภอพุทธมณฑล จังหวัดนครปฐม 73170</p>
+              <a href="mailto:liwww@mahidol.ac.th" className="flex items-center gap-2 text-[#56A6FF] transition hover:text-cyan-200">
+                <Mail size={16} className="shrink-0" />
+                <span>liwww@mahidol.ac.th</span>
+              </a>
+              <a href="https://www.li.mahidol.ac.th" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[#56A6FF] transition hover:text-cyan-200">
+                <Globe2 size={16} className="shrink-0" />
+                <span>https://www.li.mahidol.ac.th</span>
+              </a>
+              <div className="flex items-start gap-2">
+                <Phone size={16} className="mt-0.5 shrink-0 text-[#56A6FF]" />
+                <p>สอบถามบริการห้องสมุด 0-2800-2680-9 ต่อ 4225, 4264</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <Phone size={16} className="mt-0.5 shrink-0 text-[#56A6FF]" />
+                <p>สำนักงานผู้อำนวยการ โทร. 0-2441-9581</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <Printer size={16} className="mt-0.5 shrink-0 text-[#56A6FF]" />
+                <p>โทรสาร 0-2441-9580</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-start">
+            <p className="text-sm tracking-[0.2em] text-[#56A6FF]">สอบถามรายละเอียดเพิ่มเติม</p>
             <p className="mt-3 text-zinc-300">นายศกล มงคลเนตร์</p>
             <p className="mt-1 text-zinc-300">หอสมุดและคลังความรู้มหาวิทยาลัยมหิดล</p>
             <p className="mt-4 text-zinc-300">สำนักงาน: 0-2800-2680-9 ต่อ 4224</p>
             <p className="mt-1 text-zinc-300">โทรศัพท์: 095-195-1929</p>
             <p className="mt-1 text-zinc-300">อีเมล: sakol.mon@mahidol.ac.th</p>
           </div>
+
           <div className="md:text-right">
             <div className="flex flex-col items-start md:items-end">
               <Link
@@ -868,15 +918,65 @@ export default function Home() {
                 <UserRound size={16} />
                 Follow us on social media
               </div>
-              <div className="mt-5 flex gap-3 md:justify-end">
-                {["F", "X", "IG", "YT"].map((item) => (
+              <div className="mt-5 flex flex-wrap gap-3 md:justify-end">
+                {[
+                  {
+                    label: "Facebook",
+                    href: "https://www.facebook.com/MahidolLibrary/",
+                    icon: (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                        <path d="M13 2H10a4 4 0 0 0-4 4v3H3v4h3v8h4v-8h3l1-4H10V6a1 1 0 0 1 1-1h2z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    label: "Instagram",
+                    href: "https://www.instagram.com/mahidollibrary",
+                    icon: (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[1.7]">
+                        <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+                        <circle cx="12" cy="12" r="4.25" />
+                        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    label: "YouTube",
+                    href: "https://www.youtube.com/channel/UCsaXPO0j57cCfOQkuGHrGzA",
+                    icon: (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                        <path d="M21.6 7.2a2.7 2.7 0 0 0-1.9-1.9C18.3 4.8 12 4.8 12 4.8s-6.3 0-7.7.5a2.7 2.7 0 0 0-1.9 1.9C2 8.6 2 12 2 12s0 3.4.4 4.8a2.7 2.7 0 0 0 1.9 1.9c1.4.5 7.7.5 7.7.5s6.3 0 7.7-.5a2.7 2.7 0 0 0 1.9-1.9C22 15.4 22 12 22 12s0-3.4-.4-4.8ZM10 15.5v-7l6 3.5-6 3.5Z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    label: "TikTok",
+                    href: "https://www.tiktok.com/@mahidollibrary",
+                    icon: (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                        <path d="M14.3 2h2.8a5.2 5.2 0 0 0 5.2 5.2v2.9a8.1 8.1 0 0 1-5.2-1.7v7.3a6.2 6.2 0 1 1-6.2-6.2c.3 0 .6 0 .9.1v3a3.2 3.2 0 1 0 2.3 3.1V2Z" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    label: "LINE",
+                    href: "https://lin.ee/S5yFlTR",
+                    icon: (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
+                        <path d="M18.8 7.2c-.7-1.1-2-1.8-4.1-1.8H9.4c-2.2 0-3.5.7-4.2 1.8-.7 1.1-.7 2.6 0 3.8.6 1 1.8 1.6 3.7 1.8l-.9 2.2a.3.3 0 0 0 .4.4l2.8-1.8c.3-.2.7-.2 1-.2h1.3c2.2 0 3.5-.7 4.2-1.8.7-1.1.7-2.6 0-3.8Z" />
+                      </svg>
+                    ),
+                  },
+                ].map((item) => (
                   <a
-                    key={item}
-                    href="#"
-                    className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white transition hover:border-cyan-200/60 hover:text-cyan-100"
-                    aria-label={`Open ${item} channel`}
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:border-cyan-200/60 hover:text-cyan-100"
+                    aria-label={`Open ${item.label}`}
                   >
-                    {item}
+                    {item.icon}
                   </a>
                 ))}
               </div>
