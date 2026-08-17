@@ -51,6 +51,9 @@ function getErrorMessage(error: unknown): string {
   return "ไม่สามารถโหลดรายชื่อผู้เข้าอบรมได้";
 }
 
+const RESERVE_RECORDING_LABEL = "ผู้มีสิทธิ์ดูบันทึกการอบรมย้อนหลัง";
+const MAX_ELIGIBLE_ATTENDEES = 40;
+
 export default function AttendeesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -128,19 +131,40 @@ export default function AttendeesPage() {
               return null;
             }
 
+            if (topicRow.status === "skip") {
+              return null;
+            }
+
             const baseLabel = formatTopicLabel(workshop.topic_name || workshop.title || workshop.code);
 
             return {
               id: `${topicRow.registration_id}-${topicRow.workshop_id}`,
               full_name: registration.full_name,
               topicCode: workshop.code,
-              topicLabel: topicRow.status === "Waiting" ? `${baseLabel} (สำรอง)` : baseLabel,
+              topicLabel: baseLabel,
               status: topicRow.status as TopicStatus,
             };
           })
           .filter((row): row is Attendee => Boolean(row));
 
-        setAttendees(rows);
+        const rankedRows = Array.from(
+          rows.reduce((groups, row) => {
+            const group = groups.get(row.topicCode) ?? [];
+            group.push(row);
+            groups.set(row.topicCode, group);
+            return groups;
+          }, new Map<string, Attendee[]>()),
+        )
+          .flatMap(([, topicRows]) =>
+            [...topicRows]
+              .sort((left, right) => left.full_name.localeCompare(right.full_name, "th"))
+              .map((row, index) => ({
+                ...row,
+                topicLabel: index < MAX_ELIGIBLE_ATTENDEES ? row.topicLabel : RESERVE_RECORDING_LABEL,
+              })),
+          );
+
+        setAttendees(rankedRows);
       } catch (error) {
         if (!isActive) {
           return;
@@ -252,7 +276,7 @@ export default function AttendeesPage() {
               <div className="max-w-3xl">
                 <p className="text-sm tracking-[0.2em] text-[#56A6FF]">ATTENDEES LIST</p>
                 <h1 className="mt-2 font-(family-name:--font-poppins) text-3xl font-bold text-white sm:text-4xl">รายชื่อผู้เข้าอบรม</h1>
-                <p className="mt-3 text-zinc-300">แสดงรายชื่อเฉพาะหัวข้อที่เปิดรับอยู่ โดยผู้ที่มีสถานะ Waiting จะแสดงเป็นรายชื่อสำรอง</p>
+                <p className="mt-3 text-zinc-300">แสดงรายชื่อเฉพาะหัวข้อที่เปิดรับอยู่ โดยผู้ที่มีสถานะ Waiting จะแสดงเป็น “{RESERVE_RECORDING_LABEL}”</p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 lg:min-w-[220px]">
