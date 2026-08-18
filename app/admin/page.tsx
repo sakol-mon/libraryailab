@@ -9,6 +9,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatWorkshopDate, mergeWorkshopCatalog, type TopicStatus, type WorkshopRecord } from "@/lib/workshops";
 
 const ADMIN_SESSION_KEY = "library-ai-lab-admin-user";
+const REGISTRATION_OPEN_KEY = "library-ai-lab-registration-open";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type WorkshopRow = WorkshopRecord & { id: string };
@@ -68,7 +69,13 @@ function buildWorkshopCatalogPayload(workshops: WorkshopRecord[]): WorkshopCatal
 export default function AdminPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [adminUser, setAdminUser] = useState<string | null>(null);
+  const [adminUser, setAdminUser] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return window.localStorage.getItem(ADMIN_SESSION_KEY);
+  });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [globalErrorMessage, setGlobalErrorMessage] = useState("");
@@ -89,13 +96,14 @@ export default function AdminPage() {
   const [selectedWorkshopCode, setSelectedWorkshopCode] = useState("");
   const [registrants, setRegistrants] = useState<TopicRegistrantRow[]>([]);
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, TopicStatus>>({});
-
-  useEffect(() => {
-    const savedUser = window.localStorage.getItem(ADMIN_SESSION_KEY);
-    if (savedUser) {
-      setAdminUser(savedUser);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return true;
     }
-  }, []);
+
+    const savedRegistrationOpenState = window.localStorage.getItem(REGISTRATION_OPEN_KEY);
+    return savedRegistrationOpenState === null ? true : savedRegistrationOpenState === "true";
+  });
 
   useEffect(() => {
     if (!adminUser) {
@@ -409,6 +417,14 @@ export default function AdminPage() {
     }
   }
 
+  function handleToggleRegistrationOpen() {
+    setIsRegistrationOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(REGISTRATION_OPEN_KEY, String(next));
+      return next;
+    });
+  }
+
   function handleLogout() {
     window.localStorage.removeItem(ADMIN_SESSION_KEY);
     setAdminUser(null);
@@ -578,6 +594,40 @@ export default function AdminPage() {
                     {activeTopicsErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{activeTopicsErrorMessage}</p> : null}
                     {activeTopicsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{activeTopicsInfoMessage}</p> : null}
                   </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white">ตั้งค่าสถานะการเปิดรับสมัคร</h2>
+                      <p className="mt-2 text-sm text-zinc-300">สถานะปัจจุบัน: {isRegistrationOpen ? "เปิดรับสมัคร" : "ปิดรับสมัคร"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={isRegistrationOpen}
+                      onClick={handleToggleRegistrationOpen}
+                      className={[
+                        "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
+                        isRegistrationOpen
+                          ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
+                          : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
+                      ].join(" ")}
+                    >
+                      <span className={[
+                        "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
+                        isRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
+                      ].join(" ")}>
+                        <span className={[
+                          "h-3.5 w-3.5 rounded-full bg-white shadow-sm transition",
+                          isRegistrationOpen ? "translate-x-0" : "translate-x-0",
+                        ].join(" ")}></span>
+                      </span>
+                      {isRegistrationOpen ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-sm text-zinc-300">
+                    {isRegistrationOpen ? "ระบบกำลังเปิดรับสมัครอยู่" : "ระบบปิดรับสมัครชั่วคราว"}
+                  </p>
                 </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/6 p-6">

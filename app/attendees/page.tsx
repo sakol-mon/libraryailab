@@ -16,6 +16,7 @@ type Attendee = {
   topicCode: string;
   topicLabel: string;
   status: TopicStatus;
+  createdAt: string;
 };
 
 const navLinks = ["Home", "About", "Speakers", "Schedule", "Registration", "รายชื่อผู้เข้าอบรม", "Contact"];
@@ -87,7 +88,7 @@ export default function AttendeesPage() {
           { data: registrationTopics, error: registrationTopicsError },
           { data: workshopData, error: workshopsError },
         ] = await Promise.all([
-          supabase.from("registrations").select("id, full_name").order("full_name", { ascending: true }),
+          supabase.from("registrations").select("id, full_name, created_at").order("created_at", { ascending: true }),
           supabase.from("registration_topics").select("registration_id, workshop_id, status"),
           supabase.from("workshops").select("id, code, topic_name, title, event_date, is_active").order("event_date", { ascending: true }),
         ]);
@@ -143,26 +144,24 @@ export default function AttendeesPage() {
               topicCode: workshop.code,
               topicLabel: baseLabel,
               status: topicRow.status as TopicStatus,
-            };
+              createdAt: registration.created_at ?? new Date(0).toISOString(),
+            } satisfies Attendee;
           })
           .filter((row): row is Attendee => Boolean(row));
 
-        const rankedRows = Array.from(
-          rows.reduce((groups, row) => {
-            const group = groups.get(row.topicCode) ?? [];
-            group.push(row);
-            groups.set(row.topicCode, group);
-            return groups;
-          }, new Map<string, Attendee[]>()),
-        )
-          .flatMap(([, topicRows]) =>
-            [...topicRows]
-              .sort((left, right) => left.full_name.localeCompare(right.full_name, "th"))
-              .map((row, index) => ({
-                ...row,
-                topicLabel: index < MAX_ELIGIBLE_ATTENDEES ? row.topicLabel : RESERVE_RECORDING_LABEL,
-              })),
-          );
+        const topicCounts = new Map<string, number>();
+        const rankedRows = [...rows]
+          .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+          .map((row) => {
+            const currentCount = topicCounts.get(row.topicCode) ?? 0;
+            const nextCount = currentCount + 1;
+            topicCounts.set(row.topicCode, nextCount);
+
+            return {
+              ...row,
+              topicLabel: currentCount < MAX_ELIGIBLE_ATTENDEES ? row.topicLabel : RESERVE_RECORDING_LABEL,
+            };
+          });
 
         setAttendees(rankedRows);
       } catch (error) {

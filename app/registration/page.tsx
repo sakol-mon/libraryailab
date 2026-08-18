@@ -51,11 +51,18 @@ export default function RegistrationPage() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [previewName, setPreviewName] = useState("");
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState("");
   const [availableWorkshops, setAvailableWorkshops] = useState<WorkshopRecord[]>([]);
   const [isWorkshopLoading, setIsWorkshopLoading] = useState(true);
+  const [isRegistrationOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    const savedRegistrationOpenState = window.localStorage.getItem("library-ai-lab-registration-open");
+    return savedRegistrationOpenState === null ? true : savedRegistrationOpenState === "true";
+  });
 
   const organizationRequired = selectedRole === "student" || selectedRole === "staff";
 
@@ -196,7 +203,6 @@ export default function RegistrationPage() {
         throw topicInsertError;
       }
 
-      setPreviewName(fullName);
       setSubmitted(true);
       setSelectedTopics([]);
       setSelectedRole("");
@@ -313,17 +319,27 @@ export default function RegistrationPage() {
             </Link>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 grid gap-5">
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-zinc-100">ชื่อ-นามสกุล</span>
-                <input
-                  name="fullName"
-                  required
-                  className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
-                  placeholder="เช่น นายสมชาย ใจดี"
-                />
-              </label>
+          {!isRegistrationOpen ? (
+            <div className="mt-8 rounded-3xl border border-amber-400/30 bg-amber-500/10 p-6 text-center">
+              <p className="text-2xl font-bold text-[#FFE4B5]">ปิดรับสมัคร</p>
+              <p className="mt-3 text-base text-zinc-200">
+                เปิดรับสมัครใหม่อีกครั้ง
+                <br />
+                เร็ว ๆ นี้
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="mt-8 grid gap-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-zinc-100">ชื่อ-นามสกุล</span>
+                  <input
+                    name="fullName"
+                    required
+                    className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="เช่น นายสมชาย ใจดี"
+                  />
+                </label>
 
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-zinc-100">อีเมล</span>
@@ -433,6 +449,7 @@ export default function RegistrationPage() {
 
             {submitError && <p className="text-sm text-red-300">เกิดข้อผิดพลาด: {submitError}</p>}
           </form>
+          )}
 
           {submitted && (
             <motion.div

@@ -147,10 +147,11 @@ function parseWorkshopDate(dateStr: string): Date {
   return new Date(gregorianYear, month, day, 9, 0, 0);
 }
 
+const DEFAULT_TIMELINE_REFERENCE_DATE = new Date("2026-08-18T00:00:00+07:00");
+
 // Get timeline item state based on current date (Bangkok timezone)
-function getTimelineItemState(dateStr: string): "completed" | "current" | "upcoming" {
+function getTimelineItemState(dateStr: string, now: Date): "completed" | "current" | "upcoming" {
   // Get current time in Bangkok timezone (UTC+7)
-  const now = new Date();
   const bangkokTime = new Date(now.getTime() + (7 * 60 * 60 * 1000) - (now.getTimezoneOffset() * 60 * 1000));
 
   const itemDate = parseWorkshopDate(dateStr);
@@ -201,6 +202,13 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [countdown, setCountdown] = useState<CountdownState>({ days: 0, hours: 0, minutes: 0, seconds: 0, expired: false });
   const [countdownLoaded, setCountdownLoaded] = useState(false);
+  const [timelineReferenceDate] = useState<Date>(() => {
+    if (typeof window === "undefined") {
+      return DEFAULT_TIMELINE_REFERENCE_DATE;
+    }
+
+    return new Date();
+  });
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [posterOpen, setPosterOpen] = useState(false);
   const [posterZoom, setPosterZoom] = useState(1);
@@ -380,6 +388,8 @@ export default function Home() {
       })),
     [workshops],
   );
+
+  const effectiveTimelineReferenceDate = timelineReferenceDate ?? DEFAULT_TIMELINE_REFERENCE_DATE;
 
   const eventCards = useMemo(
     () => [
@@ -629,7 +639,7 @@ export default function Home() {
                 <div className="absolute left-0 right-0 top-1/2 h-[2px] -translate-y-1/2 bg-gradient-to-r from-[#2F7CFF]/80 via-[#43D5FF] to-[#56A6FF]/80" />
                 <div className="grid grid-cols-8 gap-4">
                   {timeline.map((item) => {
-                    const state = getTimelineItemState(item.eventDate);
+                    const state = getTimelineItemState(item.eventDate, effectiveTimelineReferenceDate);
                     const tone =
                       state === "completed"
                         ? "border-[#00D27A]/70 bg-[#00D27A]/12 text-[#00D27A]"
@@ -657,7 +667,7 @@ export default function Home() {
             <div className="mt-10 xl:hidden">
               <div className="relative ml-4 border-l border-[#2F65D8]/30 pl-8">
                 {timeline.map((item) => {
-                  const state = getTimelineItemState(item.eventDate);
+                  const state = getTimelineItemState(item.eventDate, effectiveTimelineReferenceDate);
                   return (
                     <article key={item.title} className="relative mb-6">
                       <span className={cn("absolute -left-[42px] top-8 h-4 w-4 rounded-full", state === "completed" ? "bg-[#00D27A]" : state === "current" ? "bg-[#43D5FF] shadow-[0_0_18px_rgba(67,213,255,0.9)]" : item.isActive ? "bg-[#FFB84D] shadow-[0_0_18px_rgba(255,184,77,0.85)]" : "bg-[#2F7CFF]")} />
