@@ -53,7 +53,6 @@ function getErrorMessage(error: unknown): string {
 }
 
 const RESERVE_RECORDING_LABEL = "ผู้มีสิทธิ์ดูบันทึกการอบรมย้อนหลัง";
-const MAX_ELIGIBLE_ATTENDEES = 40;
 
 export default function AttendeesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -149,19 +148,21 @@ export default function AttendeesPage() {
           })
           .filter((row): row is Attendee => Boolean(row));
 
-        const topicCounts = new Map<string, number>();
         const rankedRows = [...rows]
-          .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
-          .map((row) => {
-            const currentCount = topicCounts.get(row.topicCode) ?? 0;
-            const nextCount = currentCount + 1;
-            topicCounts.set(row.topicCode, nextCount);
+          .sort((left, right) => {
+            const leftIsReserve = left.status === "Waiting" || left.status === "skip";
+            const rightIsReserve = right.status === "Waiting" || right.status === "skip";
 
-            return {
-              ...row,
-              topicLabel: currentCount < MAX_ELIGIBLE_ATTENDEES ? row.topicLabel : RESERVE_RECORDING_LABEL,
-            };
-          });
+            if (leftIsReserve !== rightIsReserve) {
+              return leftIsReserve ? 1 : -1;
+            }
+
+            return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+          })
+          .map((row) => ({
+            ...row,
+            topicLabel: row.status === "Waiting" || row.status === "skip" ? RESERVE_RECORDING_LABEL : row.topicLabel,
+          }));
 
         setAttendees(rankedRows);
       } catch (error) {

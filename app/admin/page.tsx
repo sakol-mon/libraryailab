@@ -87,6 +87,7 @@ export default function AdminPage() {
   const [registrantsErrorMessage, setRegistrantsErrorMessage] = useState("");
   const [registrantsInfoMessage, setRegistrantsInfoMessage] = useState("");
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [isAttendeeManagerExpanded, setIsAttendeeManagerExpanded] = useState(false);
   const [changePasswordUsername, setChangePasswordUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -552,218 +553,248 @@ export default function AdminPage() {
               )}
             </div>
           ) : (
-            <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <div className="space-y-6">
-                <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-2xl font-semibold text-white">Workshop Activation</h2>
-                      <p className="mt-2 text-sm text-zinc-300">เลือกได้หลายหัวข้อ หัวข้อที่ active จะไปแสดงในหน้า Registration และถูกเน้นสีในหน้า Home</p>
-                    </div>
-                    <button type="button" onClick={handleLogout} className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-rose-300/50 hover:text-rose-100">
-                      <LogOut size={16} /> ออกจากระบบ
-                    </button>
-                  </div>
-
-                  <div className="mt-6 grid gap-3">
-                    {workshops.map((workshop) => (
-                      <label key={workshop.id} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <input
-                          type="checkbox"
-                          checked={activeCodes.includes(workshop.code)}
-                          onChange={(event) => {
-                            setActiveCodes((prev) =>
-                              event.target.checked ? Array.from(new Set([...prev, workshop.code])) : prev.filter((code) => code !== workshop.code),
-                            );
-                          }}
-                          className="mt-1 h-4 w-4 accent-[#FFB84D]"
-                        />
+            <div className="mt-8">
+              {!isAttendeeManagerExpanded ? (
+                <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                  <div className="space-y-6">
+                    <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-[#FFE4B5]">{workshop.title}</p>
-                          <p className="text-base text-white">{workshop.topic_name}</p>
-                          <p className="mt-1 text-xs text-zinc-400">{formatWorkshopDate(workshop.event_date)}</p>
+                          <h2 className="text-2xl font-semibold text-white">Workshop Activation</h2>
+                          <p className="mt-2 text-sm text-zinc-300">เลือกได้หลายหัวข้อ หัวข้อที่ active จะไปแสดงในหน้า Registration และถูกเน้นสีในหน้า Home</p>
                         </div>
-                      </label>
-                    ))}
-                  </div>
-
-                  <button type="button" disabled={isLoading} onClick={handleSaveActiveTopics} className="focus-ring mt-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#FF9A3D] to-[#FFC857] px-6 py-3 font-semibold text-[#351A00] transition hover:scale-105">
-                    {isLoading ? <Loader2 className="size-5 animate-spin" /> : "บันทึกหัวข้อที่เปิดใช้งาน"}
-                  </button>
-                  <div className="mt-4 min-h-[56px] space-y-2">
-                    {activeTopicsErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{activeTopicsErrorMessage}</p> : null}
-                    {activeTopicsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{activeTopicsInfoMessage}</p> : null}
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-2xl font-semibold text-white">ตั้งค่าสถานะการเปิดรับสมัคร</h2>
-                      <p className="mt-2 text-sm text-zinc-300">สถานะปัจจุบัน: {isRegistrationOpen ? "เปิดรับสมัคร" : "ปิดรับสมัคร"}</p>
-                    </div>
-                    <button
-                      type="button"
-                      aria-pressed={isRegistrationOpen}
-                      onClick={handleToggleRegistrationOpen}
-                      className={[
-                        "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
-                        isRegistrationOpen
-                          ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
-                          : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
-                      ].join(" ")}
-                    >
-                      <span className={[
-                        "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
-                        isRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
-                      ].join(" ")}>
-                        <span className={[
-                          "h-3.5 w-3.5 rounded-full bg-white shadow-sm transition",
-                          isRegistrationOpen ? "translate-x-0" : "translate-x-0",
-                        ].join(" ")}></span>
-                      </span>
-                      {isRegistrationOpen ? "ON" : "OFF"}
-                    </button>
-                  </div>
-                  <p className="mt-3 text-sm text-zinc-300">
-                    {isRegistrationOpen ? "ระบบกำลังเปิดรับสมัครอยู่" : "ระบบปิดรับสมัครชั่วคราว"}
-                  </p>
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-2xl font-semibold text-white">เปลี่ยนรหัสผ่าน</h2>
-                      <p className="mt-2 text-sm text-zinc-300">ปรับรหัสผ่านผู้ดูแลจากฐานข้อมูลโดยตรง</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowChangePassword((prev) => {
-                          const next = !prev;
-                          if (next) {
-                            setChangePasswordUsername(adminUser ?? "");
-                          }
-                          return next;
-                        });
-                      }}
-                      className="focus-ring rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-[#FFB84D]/55 hover:text-[#FFE4B5]"
-                    >
-                      {showChangePassword ? "ซ่อนฟอร์ม" : "เปลี่ยนรหัสผ่าน"}
-                    </button>
-                  </div>
-                  {showChangePassword ? (
-                    <form onSubmit={handleChangePassword} className="mt-6 grid gap-4">
-                      <label className="grid gap-2">
-                        <span className="text-sm font-semibold text-zinc-100">Username</span>
-                        <input value={changePasswordUsername} onChange={(event) => setChangePasswordUsername(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
-                      </label>
-                      <label className="grid gap-2">
-                        <span className="text-sm font-semibold text-zinc-100">รหัสผ่านปัจจุบัน</span>
-                        <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
-                      </label>
-                      <label className="grid gap-2">
-                        <span className="text-sm font-semibold text-zinc-100">รหัสผ่านใหม่</span>
-                        <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
-                      </label>
-                      <label className="grid gap-2">
-                        <span className="text-sm font-semibold text-zinc-100">ยืนยันรหัสผ่านใหม่</span>
-                        <input
-                          type="password"
-                          value={confirmNewPassword}
-                          onChange={(event) => setConfirmNewPassword(event.target.value)}
-                          className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white"
-                        />
-                      </label>
-                      <button type="submit" disabled={isAuthenticating} className="focus-ring inline-flex items-center justify-center rounded-full border border-[#FFB84D]/60 bg-[#FFB84D]/18 px-5 py-3 font-semibold text-[#FFE4B5] transition hover:bg-[#FFB84D]/26">
-                        {isAuthenticating ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
-                      </button>
-                      <div className="min-h-[56px] space-y-2">
-                        {passwordErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{passwordErrorMessage}</p> : null}
-                        {passwordInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{passwordInfoMessage}</p> : null}
+                        <button type="button" onClick={handleLogout} className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-rose-300/50 hover:text-rose-100">
+                          <LogOut size={16} /> ออกจากระบบ
+                        </button>
                       </div>
-                    </form>
-                  ) : null}
-                </div>
-              </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold text-white">จัดการสถานะผู้สมัครต่อหัวข้อ</h2>
-                    <p className="mt-2 text-sm text-zinc-300">สถานะ `Waiting` จะถูกใช้เป็นรายชื่อสำรอง และ `skip` จะไม่ถูกแสดงในหน้า attendees</p>
+                      <div className="mt-6 grid gap-3">
+                        {workshops.map((workshop) => (
+                          <label key={workshop.id} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <input
+                              type="checkbox"
+                              checked={activeCodes.includes(workshop.code)}
+                              onChange={(event) => {
+                                setActiveCodes((prev) =>
+                                  event.target.checked ? Array.from(new Set([...prev, workshop.code])) : prev.filter((code) => code !== workshop.code),
+                                );
+                              }}
+                              className="mt-1 h-4 w-4 accent-[#FFB84D]"
+                            />
+                            <div>
+                              <p className="text-sm font-semibold text-[#FFE4B5]">{workshop.title}</p>
+                              <p className="text-base text-white">{workshop.topic_name}</p>
+                              <p className="mt-1 text-xs text-zinc-400">{formatWorkshopDate(workshop.event_date)}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+
+                      <button type="button" disabled={isLoading} onClick={handleSaveActiveTopics} className="focus-ring mt-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#FF9A3D] to-[#FFC857] px-6 py-3 font-semibold text-[#351A00] transition hover:scale-105">
+                        {isLoading ? <Loader2 className="size-5 animate-spin" /> : "บันทึกหัวข้อที่เปิดใช้งาน"}
+                      </button>
+                      <div className="mt-4 min-h-[56px] space-y-2">
+                        {activeTopicsErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{activeTopicsErrorMessage}</p> : null}
+                        {activeTopicsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{activeTopicsInfoMessage}</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-2xl font-semibold text-white">ตั้งค่าสถานะการเปิดรับสมัคร</h2>
+                          <p className="mt-2 text-sm text-zinc-300">สถานะปัจจุบัน: {isRegistrationOpen ? "เปิดรับสมัคร" : "ปิดรับสมัคร"}</p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={isRegistrationOpen}
+                          onClick={handleToggleRegistrationOpen}
+                          className={[
+                            "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
+                            isRegistrationOpen
+                              ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
+                              : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
+                          ].join(" ")}
+                        >
+                          <span className={[
+                            "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
+                            isRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
+                          ].join(" ")}>
+                            <span className={[
+                              "h-3.5 w-3.5 rounded-full bg-white shadow-sm transition",
+                              isRegistrationOpen ? "translate-x-0" : "translate-x-0",
+                            ].join(" ")}></span>
+                          </span>
+                          {isRegistrationOpen ? "ON" : "OFF"}
+                        </button>
+                      </div>
+                      <p className="mt-3 text-sm text-zinc-300">
+                        {isRegistrationOpen ? "ระบบกำลังเปิดรับสมัครอยู่" : "ระบบปิดรับสมัครชั่วคราว"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-2xl font-semibold text-white">เปลี่ยนรหัสผ่าน</h2>
+                          <p className="mt-2 text-sm text-zinc-300">ปรับรหัสผ่านผู้ดูแลจากฐานข้อมูลโดยตรง</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowChangePassword((prev) => {
+                              const next = !prev;
+                              if (next) {
+                                setChangePasswordUsername(adminUser ?? "");
+                              }
+                              return next;
+                            });
+                          }}
+                          className="focus-ring rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-[#FFB84D]/55 hover:text-[#FFE4B5]"
+                        >
+                          {showChangePassword ? "ซ่อนฟอร์ม" : "เปลี่ยนรหัสผ่าน"}
+                        </button>
+                      </div>
+                      {showChangePassword ? (
+                        <form onSubmit={handleChangePassword} className="mt-6 grid gap-4">
+                          <label className="grid gap-2">
+                            <span className="text-sm font-semibold text-zinc-100">Username</span>
+                            <input value={changePasswordUsername} onChange={(event) => setChangePasswordUsername(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="text-sm font-semibold text-zinc-100">รหัสผ่านปัจจุบัน</span>
+                            <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="text-sm font-semibold text-zinc-100">รหัสผ่านใหม่</span>
+                            <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white" />
+                          </label>
+                          <label className="grid gap-2">
+                            <span className="text-sm font-semibold text-zinc-100">ยืนยันรหัสผ่านใหม่</span>
+                            <input
+                              type="password"
+                              value={confirmNewPassword}
+                              onChange={(event) => setConfirmNewPassword(event.target.value)}
+                              className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-white"
+                            />
+                          </label>
+                          <button type="submit" disabled={isAuthenticating} className="focus-ring inline-flex items-center justify-center rounded-full border border-[#FFB84D]/60 bg-[#FFB84D]/18 px-5 py-3 font-semibold text-[#FFE4B5] transition hover:bg-[#FFB84D]/26">
+                            {isAuthenticating ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}
+                          </button>
+                          <div className="min-h-[56px] space-y-2">
+                            {passwordErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{passwordErrorMessage}</p> : null}
+                            {passwordInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{passwordInfoMessage}</p> : null}
+                          </div>
+                        </form>
+                      ) : null}
+                    </div>
                   </div>
-                  <label className="grid gap-2 text-sm text-zinc-200">
-                    <span>เลือกหัวข้อ</span>
-                    <select value={selectedWorkshopCode} onChange={(event) => setSelectedWorkshopCode(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-3 text-white">
-                      {workshops.map((workshop) => (
-                        <option key={workshop.id} value={workshop.code}>
-                          {workshop.title} - {workshop.topic_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+
+                  <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                      <div>
+                        <h2 className="text-2xl font-semibold text-white">จัดการสถานะผู้สมัครต่อหัวข้อ</h2>
+                        <p className="mt-2 text-sm text-zinc-300">สถานะ `Waiting` จะถูกใช้เป็นรายชื่อสำรอง และ `skip` จะไม่ถูกแสดงในหน้า attendees</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAttendeeManagerExpanded(true)}
+                        className="focus-ring inline-flex items-center justify-center rounded-full border border-[#FFB84D]/60 bg-[#FFB84D]/18 px-5 py-3 font-semibold text-[#FFE4B5] transition hover:bg-[#FFB84D]/26"
+                      >
+                        Manage attendees
+                      </button>
+                    </div>
+                  </div>
                 </div>
-
-                {selectedWorkshop ? (
-                  <p className="mt-4 text-sm text-[#FFE4B5]">หัวข้อที่เลือก: {selectedWorkshop.title} - {selectedWorkshop.topic_name}</p>
-                ) : null}
-
-                <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-                  <table className="w-full border-collapse text-left">
-                    <thead className="bg-white/8 text-sm text-zinc-300">
-                      <tr>
-                        <th className="px-5 py-4 font-semibold">ชื่อผู้สมัคร</th>
-                        <th className="px-5 py-4 font-semibold">อีเมล</th>
-                        <th className="px-5 py-4 font-semibold">สถานะ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedWorkshopRegistrants.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-5 py-8 text-center text-zinc-300">ยังไม่มีผู้สมัครในหัวข้อนี้</td>
-                        </tr>
-                      ) : (
-                        selectedWorkshopRegistrants.map((row) => (
-                          <tr key={`${row.registrationId}-${row.workshopId}`} className="border-t border-white/10 text-white">
-                            <td className="px-5 py-4 font-medium">{row.fullName}</td>
-                            <td className="px-5 py-4 text-zinc-300">{row.email}</td>
-                            <td className="px-5 py-4">
-                              <select
-                                value={row.status}
-                                onChange={(event) => handleRegistrantStatusChange(row.registrationId, row.workshopId, event.target.value as TopicStatus)}
-                                className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-2 text-white"
-                              >
-                                <option value="Participant">Participant</option>
-                                <option value="Waiting">Waiting</option>
-                                <option value="skip">skip</option>
-                              </select>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-zinc-300">รายการที่ยังไม่บันทึก: {Object.keys(pendingStatusChanges).length}</p>
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                     <button
                       type="button"
-                      disabled={isLoading || Object.keys(pendingStatusChanges).length === 0}
-                      onClick={handleSaveRegistrantStatuses}
-                      className="focus-ring inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#FF9A3D] to-[#FFC857] px-6 py-3 font-semibold text-[#351A00] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => setIsAttendeeManagerExpanded(false)}
+                      className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:border-[#FFB84D]/55 hover:text-[#FFE4B5]"
                     >
-                      {isLoading ? <Loader2 className="size-5 animate-spin" /> : "บันทึก"}
+                      ย้อนกลับ
                     </button>
+                    <div>
+                      <h2 className="text-2xl font-semibold text-white">จัดการสถานะผู้สมัครต่อหัวข้อ</h2>
+                    </div>
                   </div>
-                  <div className="min-h-[56px] space-y-2">
-                    {registrantsErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{registrantsErrorMessage}</p> : null}
-                    {registrantsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{registrantsInfoMessage}</p> : null}
+
+                  <div className="flex flex-wrap items-end justify-between gap-4">
+                    <p className="text-sm text-zinc-300">สถานะ `Waiting` จะถูกใช้เป็นรายชื่อสำรอง และ `skip` จะไม่ถูกแสดงในหน้า attendees</p>
+                    <label className="grid gap-2 text-sm text-zinc-200">
+                      <span>เลือกหัวข้อ</span>
+                      <select value={selectedWorkshopCode} onChange={(event) => setSelectedWorkshopCode(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-3 text-white">
+                        {workshops.map((workshop) => (
+                          <option key={workshop.id} value={workshop.code}>
+                            {workshop.title} - {workshop.topic_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  {selectedWorkshop ? (
+                    <p className="mt-4 text-sm text-[#FFE4B5]">หัวข้อที่เลือก: {selectedWorkshop.title} - {selectedWorkshop.topic_name}</p>
+                  ) : null}
+
+                  <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/5">
+                    <table className="w-full border-collapse text-left">
+                      <thead className="bg-white/8 text-sm text-zinc-300">
+                        <tr>
+                          <th className="px-5 py-4 font-semibold">ชื่อผู้สมัคร</th>
+                          <th className="px-5 py-4 font-semibold">อีเมล</th>
+                          <th className="px-5 py-4 font-semibold">สถานะ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedWorkshopRegistrants.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-5 py-8 text-center text-zinc-300">ยังไม่มีผู้สมัครในหัวข้อนี้</td>
+                          </tr>
+                        ) : (
+                          selectedWorkshopRegistrants.map((row) => (
+                            <tr key={`${row.registrationId}-${row.workshopId}`} className="border-t border-white/10 text-white">
+                              <td className="px-5 py-4 font-medium">{row.fullName}</td>
+                              <td className="px-5 py-4 text-zinc-300">{row.email}</td>
+                              <td className="px-5 py-4">
+                                <select
+                                  value={row.status}
+                                  onChange={(event) => handleRegistrantStatusChange(row.registrationId, row.workshopId, event.target.value as TopicStatus)}
+                                  className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-2 text-white"
+                                >
+                                  <option value="Participant">Participant</option>
+                                  <option value="Waiting">Waiting</option>
+                                  <option value="skip">skip</option>
+                                </select>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-zinc-300">รายการที่ยังไม่บันทึก: {Object.keys(pendingStatusChanges).length}</p>
+                      <button
+                        type="button"
+                        disabled={isLoading || Object.keys(pendingStatusChanges).length === 0}
+                        onClick={handleSaveRegistrantStatuses}
+                        className="focus-ring inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#FF9A3D] to-[#FFC857] px-6 py-3 font-semibold text-[#351A00] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isLoading ? <Loader2 className="size-5 animate-spin" /> : "บันทึก"}
+                      </button>
+                    </div>
+                    <div className="min-h-[56px] space-y-2">
+                      {registrantsErrorMessage ? <p className="rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2 text-sm text-rose-100">{registrantsErrorMessage}</p> : null}
+                      {registrantsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{registrantsInfoMessage}</p> : null}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </motion.div>
