@@ -88,6 +88,14 @@ export default function AdminPage() {
   const [registrantsInfoMessage, setRegistrantsInfoMessage] = useState("");
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isAttendeeManagerExpanded, setIsAttendeeManagerExpanded] = useState(false);
+  const [isOnsiteRegistrationOpen, setIsOnsiteRegistrationOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    const savedOnsiteRegistrationState = window.localStorage.getItem("library-ai-lab-onsite-registration-open");
+    return savedOnsiteRegistrationState === null ? true : savedOnsiteRegistrationState === "true";
+  });
   const [changePasswordUsername, setChangePasswordUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -426,6 +434,14 @@ export default function AdminPage() {
     });
   }
 
+  function handleToggleOnsiteRegistrationOpen() {
+    setIsOnsiteRegistrationOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("library-ai-lab-onsite-registration-open", String(next));
+      return next;
+    });
+  }
+
   function handleLogout() {
     window.localStorage.removeItem(ADMIN_SESSION_KEY);
     setAdminUser(null);
@@ -630,6 +646,37 @@ export default function AdminPage() {
                       </div>
                       <p className="mt-3 text-sm text-zinc-300">
                         {isRegistrationOpen ? "ระบบกำลังเปิดรับสมัครอยู่" : "ระบบปิดรับสมัครชั่วคราว"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/6 p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-2xl font-semibold text-white">ปิดการรับสมัคร On-site</h2>
+                          <p className="mt-2 text-sm text-zinc-300">สถานะปัจจุบัน: {isOnsiteRegistrationOpen ? "เปิดรับสมัคร On-site" : "ปิดรับสมัคร On-site"}</p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={isOnsiteRegistrationOpen}
+                          onClick={handleToggleOnsiteRegistrationOpen}
+                          className={[
+                            "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
+                            isOnsiteRegistrationOpen
+                              ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
+                              : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
+                          ].join(" ")}
+                        >
+                          <span className={[
+                            "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
+                            isOnsiteRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
+                          ].join(" ")}>
+                            <span className="h-3.5 w-3.5 rounded-full bg-white shadow-sm transition"></span>
+                          </span>
+                          {isOnsiteRegistrationOpen ? "ON" : "OFF"}
+                        </button>
+                      </div>
+                      <p className="mt-3 text-sm text-zinc-300">
+                        {isOnsiteRegistrationOpen ? "ผู้สมัครสามารถเลือกเข้าร่วม On-site ได้" : "ผู้สมัครไม่สามารถเลือกเข้าร่วม On-site ได้ ต้องเลือกรับชมบันทึกย้อนหลัง"}
                       </p>
                     </div>
 

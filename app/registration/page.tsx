@@ -29,6 +29,13 @@ function navHref(item: string): string {
 }
 
 const strictEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const thaiNameRegex = /^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$/u;
+const ONSITE_REGISTRATION_OPEN_KEY = "library-ai-lab-onsite-registration-open";
+type TopicAttendanceMode = "onsite" | "recording";
+
+function isValidThaiName(value: string): boolean {
+  return thaiNameRegex.test(value);
+}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -52,6 +59,8 @@ export default function RegistrationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [topicAttendanceMode, setTopicAttendanceMode] = useState<Record<string, TopicAttendanceMode>>({});
+  const [topicSelectionError, setTopicSelectionError] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [availableWorkshops, setAvailableWorkshops] = useState<WorkshopRecord[]>([]);
   const [isWorkshopLoading, setIsWorkshopLoading] = useState(true);
@@ -62,6 +71,14 @@ export default function RegistrationPage() {
 
     const savedRegistrationOpenState = window.localStorage.getItem("library-ai-lab-registration-open");
     return savedRegistrationOpenState === null ? true : savedRegistrationOpenState === "true";
+  });
+  const [isOnsiteRegistrationOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    const savedOnsiteState = window.localStorage.getItem(ONSITE_REGISTRATION_OPEN_KEY);
+    return savedOnsiteState === null ? true : savedOnsiteState === "true";
   });
 
   const organizationRequired = selectedRole === "student" || selectedRole === "staff";
@@ -123,7 +140,10 @@ export default function RegistrationPage() {
 
     const formElement = event.currentTarget;
     const formData = new FormData(formElement);
-    const fullName = String(formData.get("fullName") ?? "").trim();
+    const title = String(formData.get("title") ?? "").trim();
+    const firstName = String(formData.get("firstName") ?? "").trim();
+    const lastName = String(formData.get("lastName") ?? "").trim();
+    const fullName = [title, firstName, lastName].filter(Boolean).join(" ");
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const phone = String(formData.get("phone") ?? "").trim();
     const organization = String(formData.get("organization") ?? "").trim();
@@ -132,6 +152,24 @@ export default function RegistrationPage() {
       .getAll("topics")
       .map((value) => String(value).trim())
       .filter((value) => value.length > 0);
+    const selectedTopicModes = Object.fromEntries(
+      selectedTopicCodes.map((code) => {
+        const modeValue = String(formData.get(`attendance-${code}`) ?? "");
+        return [code, modeValue === "recording" ? "recording" : modeValue === "onsite" ? "onsite" : ""] as const;
+      }),
+    ) as Record<string, TopicAttendanceMode | "">;
+
+    if (!title || !firstName || !lastName) {
+      setSubmitted(false);
+      setSubmitError("กรุณากรอก คำนำหน้านาม, ชื่อ, และนามสกุล ให้ครบทุกช่อง");
+      return;
+    }
+
+    if (!isValidThaiName(title) || !isValidThaiName(firstName) || !isValidThaiName(lastName)) {
+      setSubmitted(false);
+      setSubmitError("กรุณากรอก คำนำหน้านาม, ชื่อ, และนามสกุล เป็นภาษาไทยเท่านั้น โดยไม่ใช้ภาษาอังกฤษ ตัวเลข หรืออักขระพิเศษ");
+      return;
+    }
 
     if (!strictEmailRegex.test(email)) {
       setSubmitted(false);
@@ -147,9 +185,28 @@ export default function RegistrationPage() {
 
     if (selectedTopicCodes.length === 0) {
       setSubmitted(false);
+      setTopicSelectionError("กรุณาเลือกหัวข้อที่สนใจอย่างน้อย 1 รายการ");
       setSubmitError("กรุณาเลือกหัวข้อที่สนใจอย่างน้อย 1 รายการ");
       return;
     }
+
+    const missingAttendanceMode = selectedTopicCodes.find((code) => !selectedTopicModes[code]);
+    if (missingAttendanceMode) {
+      setSubmitted(false);
+      setTopicSelectionError("กรุณาเลือกวิธีเข้าร่วมสำหรับหัวข้อที่สนใจทุกหัวข้อ ก่อนส่งข้อมูลสมัคร");
+      setSubmitError("กรุณาเลือกวิธีเข้าร่วมสำหรับหัวข้อที่สนใจทุกหัวข้อ ก่อนส่งข้อมูลสมัคร");
+      return;
+    }
+
+    const disabledOnsiteTopic = selectedTopicCodes.find((code) => selectedTopicModes[code] === "onsite" && !isOnsiteRegistrationOpen);
+    if (disabledOnsiteTopic) {
+      setSubmitted(false);
+      setTopicSelectionError("การสมัคร On-site ถูกปิดชั่วคราว กรุณาเลือก รับชมบันทึกการอบรมย้อนหลัง แทน");
+      setSubmitError("การสมัคร On-site ถูกปิดชั่วคราว กรุณาเลือก รับชมบันทึกการอบรมย้อนหลัง แทน");
+      return;
+    }
+
+    setTopicSelectionError("");
 
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
@@ -196,6 +253,7 @@ export default function RegistrationPage() {
       const topicRows = workshops.map((workshop) => ({
         registration_id: registrationId,
         workshop_id: workshop.id,
+        status: selectedTopicModes[workshop.code] === "recording" ? "skip" : "Participant",
       }));
 
       const { error: topicInsertError } = await supabase.from("registration_topics").insert(topicRows);
@@ -205,6 +263,7 @@ export default function RegistrationPage() {
 
       setSubmitted(true);
       setSelectedTopics([]);
+      setTopicAttendanceMode({});
       setSelectedRole("");
       formElement.reset();
     } catch (error) {
@@ -216,6 +275,9 @@ export default function RegistrationPage() {
   };
 
   const handleTopicToggle = (topicId: string, checked: boolean) => {
+    setTopicSelectionError("");
+    setSubmitError("");
+
     setSelectedTopics((prev) => {
       if (checked) {
         if (prev.includes(topicId)) {
@@ -224,6 +286,12 @@ export default function RegistrationPage() {
 
         return [...prev, topicId];
       }
+
+      setTopicAttendanceMode((current) => {
+        const next = { ...current };
+        delete next[topicId];
+        return next;
+      });
 
       return prev.filter((item) => item !== topicId);
     });
@@ -330,83 +398,111 @@ export default function RegistrationPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-8 grid gap-5">
-              <div className="grid gap-5 md:grid-cols-2">
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-zinc-100">ชื่อ-นามสกุล</span>
+              <div className="grid gap-5 md:grid-cols-[minmax(120px,0.8fr)_minmax(0,1.4fr)_minmax(0,1.4fr)]">
+                <label className="grid gap-2 md:col-span-1">
+                  <span className="text-sm font-semibold text-zinc-100">คำนำหน้านาม</span>
                   <input
-                    name="fullName"
+                    name="title"
                     required
-                    className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
-                    placeholder="เช่น นายสมชาย ใจดี"
+                    className="focus-ring w-full max-w-[140px] rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="เช่น นาย"
+                    pattern="^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$"
+                    title="กรุณากรอกคำนำหน้านามเป็นภาษาไทยเท่านั้น"
                   />
                 </label>
 
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-zinc-100">อีเมล</span>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  autoComplete="email"
-                  pattern="^[^\s@]+@[^\s@]+\.[^\s@]{2,}$"
-                  title="กรุณาใส่อีเมลที่ถูกต้อง (เช่น name@example.com)"
-                  className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
-                  placeholder="name@example.com"
-                />
-              </label>
+                <label className="grid gap-2 md:col-span-1">
+                  <span className="text-sm font-semibold text-zinc-100">ชื่อ</span>
+                  <input
+                    name="firstName"
+                    required
+                    className="focus-ring w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="เช่น สมชาย"
+                    pattern="^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$"
+                    title="กรุณากรอกชื่อเป็นภาษาไทยเท่านั้น"
+                  />
+                </label>
 
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-zinc-100">หมายเลขโทรศัพท์</span>
-                <input
-                  name="phone"
-                  required
-                  type="tel"
-                  pattern="(02[0-9]{7}|0[3457][0-9]{7}|0[689][0-9]{8})( ?(ต่อ|ext\.?|#) ?[0-9]+)?"
-                  title="กรุณาใส่เบอร์โทรที่ถูกต้อง: บ้าน (02xxxxxxx) หรือ (03X-07Xxxxxxxx) หรือมือถือ (06X/08X/09Xxxxxxxxx) เช่น 0812345678"
-                  className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
-                  placeholder="08xxxxxxxx"
-                />
-              </label>
+                <label className="grid gap-2 md:col-span-1">
+                  <span className="text-sm font-semibold text-zinc-100">นามสกุล</span>
+                  <input
+                    name="lastName"
+                    required
+                    className="focus-ring w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="เช่น ใจดี"
+                    pattern="^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$"
+                    title="กรุณากรอกนามสกุลเป็นภาษาไทยเท่านั้น"
+                  />
+                </label>
 
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-zinc-100">
-                  หน่วยงาน/คณะ {organizationRequired ? <span className="text-[#56A6FF]">*</span> : null}
-                </span>
-                <input
-                  name="organization"
-                  required={organizationRequired}
-                  className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
-                  placeholder="ระบุหน่วยงานหรือคณะ"
-                />
-              </label>
-            </div>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-zinc-100">อีเมล</span>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    autoComplete="email"
+                    pattern="^[^\s@]+@[^\s@]+\.[^\s@]{2,}$"
+                    title="กรุณาใส่อีเมลที่ถูกต้อง (เช่น name@example.com)"
+                    className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="name@example.com"
+                  />
+                </label>
 
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-zinc-100">สถานะผู้สมัคร</span>
-              <select
-                name="role"
-                required
-                value={selectedRole}
-                onChange={(event) => setSelectedRole(event.target.value)}
-                className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100"
-              >
-                <option value="" disabled className="text-black">
-                  เลือกสถานะ
-                </option>
-                <option value="student" className="text-black">
-                  นักศึกษามหาวิทยาลัยมหิดล
-                </option>
-                <option value="staff" className="text-black">
-                  บุคลากรมหาวิทยาลัยมหิดล
-                </option>
-                <option value="school-network" className="text-black">
-                  ครู/นักเรียน เครือข่ายความร่วมมือ
-                </option>
-                <option value="general" className="text-black">
-                  บุคคลทั่วไป/ผู้สนใจ
-                </option>
-              </select>
-            </label>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-zinc-100">หมายเลขโทรศัพท์</span>
+                  <input
+                    name="phone"
+                    required
+                    type="tel"
+                    pattern="(02[0-9]{7}|0[3457][0-9]{7}|0[689][0-9]{8})( ?(ต่อ|ext\.?|#) ?[0-9]+)?"
+                    title="กรุณาใส่เบอร์โทรที่ถูกต้อง: บ้าน (02xxxxxxx) หรือ (03X-07Xxxxxxxx) หรือมือถือ (06X/08X/09Xxxxxxxxx) เช่น 0812345678"
+                    className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                    placeholder="08xxxxxxxx"
+                  />
+                </label>
+
+                <div className="grid gap-5 md:col-span-4 md:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-sm font-semibold text-zinc-100">
+                      หน่วยงาน/คณะ {organizationRequired ? <span className="text-[#56A6FF]">*</span> : null}
+                    </span>
+                    <input
+                      name="organization"
+                      required={organizationRequired}
+                      className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
+                      placeholder="ระบุหน่วยงานหรือคณะ"
+                    />
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-sm font-semibold text-zinc-100">สถานะผู้สมัคร</span>
+                    <select
+                      name="role"
+                      required
+                      value={selectedRole}
+                      onChange={(event) => setSelectedRole(event.target.value)}
+                      className="focus-ring rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100"
+                    >
+                      <option value="" disabled className="text-black">
+                        เลือกสถานะ
+                      </option>
+                      <option value="student" className="text-black">
+                        นักศึกษามหาวิทยาลัยมหิดล
+                      </option>
+                      <option value="staff" className="text-black">
+                        บุคลากรมหาวิทยาลัยมหิดล
+                      </option>
+                      <option value="school-network" className="text-black">
+                        ครู/นักเรียน เครือข่ายความร่วมมือ
+                      </option>
+                      <option value="general" className="text-black">
+                        บุคคลทั่วไป/ผู้สนใจ
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              </div>
 
             <fieldset className="rounded-2xl border border-white/20 bg-white/8 p-4">
               <legend className="px-2 text-sm font-semibold text-zinc-100">หัวข้อที่สนใจ</legend>
@@ -416,25 +512,66 @@ export default function RegistrationPage() {
                 <p className="mt-4 text-sm text-amber-200">ยังไม่มีหัวข้อที่เปิดรับสมัครจากระบบ Admin</p>
               ) : (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {availableWorkshops.map((workshop) => (
-                  <label key={workshop.id} className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/8 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="topics"
-                      value={workshop.code}
-                      onChange={(event) => handleTopicToggle(workshop.code, event.target.checked)}
-                      className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#43D5FF]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-[#56A6FF]">{workshop.title}</p>
-                      <p className="text-sm font-medium text-zinc-100">{workshop.topic_name}</p>
-                      <p className="text-xs text-zinc-400">📅 {formatWorkshopDate(workshop.event_date)}</p>
-                    </div>
-                  </label>
-                  ))}
+                  {availableWorkshops.map((workshop) => {
+                    const isSelected = selectedTopics.includes(workshop.code);
+                    const selectedMode = topicAttendanceMode[workshop.code];
+
+                    return (
+                      <div key={workshop.id} className="rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/8">
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            name="topics"
+                            value={workshop.code}
+                            checked={isSelected}
+                            onChange={(event) => handleTopicToggle(workshop.code, event.target.checked)}
+                            className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#43D5FF]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-[#56A6FF]">{workshop.title}</p>
+                            <p className="text-sm font-medium text-zinc-100">{workshop.topic_name}</p>
+                            <p className="text-xs text-zinc-400">📅 {formatWorkshopDate(workshop.event_date)}</p>
+                          </div>
+                        </label>
+
+                        {isSelected && (
+                          <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-[#08182D]/70 p-3">
+                            <p className="text-xs font-semibold text-zinc-200">เลือกการเข้าร่วม</p>
+                            <label className="flex items-center gap-2 text-sm text-zinc-100">
+                              <input
+                                type="radio"
+                                name={`attendance-${workshop.code}`}
+                                value="onsite"
+                                checked={selectedMode === "onsite"}
+                                onChange={() => setTopicAttendanceMode((current) => ({ ...current, [workshop.code]: "onsite" }))}
+                                disabled={!isOnsiteRegistrationOpen}
+                                className="h-4 w-4 accent-[#43D5FF] disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                              <span className={isOnsiteRegistrationOpen ? "" : "text-zinc-500 line-through"}>เข้าร่วมอบรม On-site</span>
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-zinc-100">
+                              <input
+                                type="radio"
+                                name={`attendance-${workshop.code}`}
+                                value="recording"
+                                checked={selectedMode === "recording"}
+                                onChange={() => setTopicAttendanceMode((current) => ({ ...current, [workshop.code]: "recording" }))}
+                                className="h-4 w-4 accent-[#43D5FF]"
+                              />
+                              <span>รับชมบันทึกการอบรมย้อนหลัง</span>
+                            </label>
+                            {!isOnsiteRegistrationOpen ? (
+                              <p className="text-xs text-amber-200">ปิดการรับสมัคร On-site โดยให้เลือกรับชมบันทึกการอบรมย้อนหลังเท่านั้น</p>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               <p className="mt-4 text-xs text-zinc-400">เลือกแล้ว {selectedTopics.length} รายการ</p>
+              {topicSelectionError ? <p className="mt-3 text-sm text-red-300">{topicSelectionError}</p> : null}
             </fieldset>
 
             <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -447,7 +584,6 @@ export default function RegistrationPage() {
               </button>
             </div>
 
-            {submitError && <p className="text-sm text-red-300">เกิดข้อผิดพลาด: {submitError}</p>}
           </form>
           )}
 
