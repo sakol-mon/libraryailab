@@ -6,10 +6,22 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { formatWorkshopDate, mergeWorkshopCatalog, type TopicStatus, type WorkshopRecord } from "@/lib/workshops";
+import {
+  formatWorkshopDate,
+  isOnsiteStatusWorkshop,
+  isRegistrationStatusWorkshop,
+  mergeWorkshopCatalog,
+  ONSITE_STATUS_WORKSHOP_CODE,
+  ONSITE_STATUS_WORKSHOP_NAME,
+  ONSITE_STATUS_WORKSHOP_TITLE,
+  REGISTRATION_STATUS_WORKSHOP_CODE,
+  REGISTRATION_STATUS_WORKSHOP_NAME,
+  REGISTRATION_STATUS_WORKSHOP_TITLE,
+  type TopicStatus,
+  type WorkshopRecord,
+} from "@/lib/workshops";
 
 const ADMIN_SESSION_KEY = "library-ai-lab-admin-user";
-const REGISTRATION_OPEN_KEY = "library-ai-lab-registration-open";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type WorkshopRow = WorkshopRecord & { id: string };
@@ -21,6 +33,7 @@ type TopicRegistrantRow = {
   fullName: string;
   email: string;
   status: TopicStatus;
+  createdAt: string;
 };
 
 type RegistrationTopicRow = {
@@ -33,6 +46,7 @@ type RegistrationRow = {
   id: string;
   full_name: string;
   email: string;
+  created_at: string;
 };
 
 type WorkshopCatalogPayload = Pick<WorkshopRecord, "code" | "title" | "topic_name" | "event_date" | "is_active">;
@@ -88,14 +102,9 @@ export default function AdminPage() {
   const [registrantsInfoMessage, setRegistrantsInfoMessage] = useState("");
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isAttendeeManagerExpanded, setIsAttendeeManagerExpanded] = useState(false);
-  const [isOnsiteRegistrationOpen, setIsOnsiteRegistrationOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    const savedOnsiteRegistrationState = window.localStorage.getItem("library-ai-lab-onsite-registration-open");
-    return savedOnsiteRegistrationState === null ? true : savedOnsiteRegistrationState === "true";
-  });
+  const [isOnsiteRegistrationOpen, setIsOnsiteRegistrationOpen] = useState<boolean>(true);
+  const [registrationStatusWorkshop, setRegistrationStatusWorkshop] = useState<WorkshopRow | null>(null);
+  const [onsiteStatusWorkshop, setOnsiteStatusWorkshop] = useState<WorkshopRow | null>(null);
   const [changePasswordUsername, setChangePasswordUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -105,14 +114,7 @@ export default function AdminPage() {
   const [selectedWorkshopCode, setSelectedWorkshopCode] = useState("");
   const [registrants, setRegistrants] = useState<TopicRegistrantRow[]>([]);
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, TopicStatus>>({});
-  const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    const savedRegistrationOpenState = window.localStorage.getItem(REGISTRATION_OPEN_KEY);
-    return savedRegistrationOpenState === null ? true : savedRegistrationOpenState === "true";
-  });
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
 
   useEffect(() => {
     if (!adminUser) {
@@ -155,6 +157,48 @@ export default function AdminPage() {
         }
 
         let workshopData = initialWorkshopData ?? [];
+
+        const hasRegistrationStatusRow = workshopData.some((workshop) => isRegistrationStatusWorkshop(workshop));
+        const hasOnsiteStatusRow = workshopData.some((workshop) => isOnsiteStatusWorkshop(workshop));
+        if (!hasRegistrationStatusRow || !hasOnsiteStatusRow) {
+          const statusRows = [];
+          if (!hasRegistrationStatusRow) {
+            statusRows.push({
+              code: REGISTRATION_STATUS_WORKSHOP_CODE,
+              title: REGISTRATION_STATUS_WORKSHOP_TITLE,
+              topic_name: REGISTRATION_STATUS_WORKSHOP_NAME,
+              event_date: "2026-01-01",
+              is_active: true,
+            });
+          }
+          if (!hasOnsiteStatusRow) {
+            statusRows.push({
+              code: ONSITE_STATUS_WORKSHOP_CODE,
+              title: ONSITE_STATUS_WORKSHOP_TITLE,
+              topic_name: ONSITE_STATUS_WORKSHOP_NAME,
+              event_date: "2026-01-01",
+              is_active: true,
+            });
+          }
+
+          const { error: insertStatusError } = await supabase.from("workshops").upsert(statusRows, { onConflict: "code" });
+
+          if (insertStatusError) {
+            throw insertStatusError;
+          }
+
+          const { data: refreshedWorkshopData, error: refreshedWorkshopError } = await supabase
+            .from("workshops")
+            .select("id, code, title, topic_name, event_date, is_active")
+            .order("event_date", { ascending: true });
+
+          if (refreshedWorkshopError) {
+            throw refreshedWorkshopError;
+          }
+
+          workshopData = refreshedWorkshopData ?? [];
+        }
+
         let mergedWorkshops = mergeWorkshopCatalog(workshopData);
 
         if (mergedWorkshops.some((workshop) => !hasValidWorkshopId(workshop))) {
@@ -184,10 +228,20 @@ export default function AdminPage() {
           id: workshopData?.find((row) => row.code === workshop.code)?.id ?? workshop.id ?? workshop.code,
         }));
 
-        setWorkshops(workshopRows);
-        setActiveCodes(workshopRows.filter((workshop) => workshop.is_active).map((workshop) => workshop.code));
+        const registrationStatusRow = workshopRows.find(isRegistrationStatusWorkshop) ?? null;
+        const onsiteStatusRow = workshopRows.find(isOnsiteStatusWorkshop) ?? null;
+        setRegistrationStatusWorkshop(registrationStatusRow);
+        setOnsiteStatusWorkshop(onsiteStatusRow);
+        setIsRegistrationOpen(registrationStatusRow ? Boolean(registrationStatusRow.is_active) : true);
+        setIsOnsiteRegistrationOpen(onsiteStatusRow ? Boolean(onsiteStatusRow.is_active) : true);
 
-        setSelectedWorkshopCode((prev) => prev || workshopRows[0]?.code || "");
+        const displayWorkshops = workshopRows.filter(
+          (workshop) => !isRegistrationStatusWorkshop(workshop) && !isOnsiteStatusWorkshop(workshop),
+        );
+        setWorkshops(displayWorkshops);
+        setActiveCodes(displayWorkshops.filter((workshop) => workshop.is_active).map((workshop) => workshop.code));
+
+        setSelectedWorkshopCode((prev) => prev || displayWorkshops[0]?.code || "");
 
         const registrationById = new Map(((registrationData ?? []) as RegistrationRow[]).map((registration) => [registration.id, registration]));
         const workshopById = new Map(workshopRows.map((workshop) => [workshop.id, workshop]));
@@ -208,6 +262,7 @@ export default function AdminPage() {
               fullName: registration.full_name,
               email: registration.email,
               status: topicRow.status as TopicStatus,
+              createdAt: registration.created_at,
             };
           })
           .filter((row): row is TopicRegistrantRow => Boolean(row));
@@ -240,7 +295,10 @@ export default function AdminPage() {
   );
 
   const selectedWorkshopRegistrants = useMemo(
-    () => registrants.filter((row) => row.workshopCode === selectedWorkshopCode),
+    () =>
+      registrants
+        .filter((row) => row.workshopCode === selectedWorkshopCode)
+        .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()),
     [registrants, selectedWorkshopCode],
   );
 
@@ -350,10 +408,12 @@ export default function AdminPage() {
         throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
       }
 
-      const nextWorkshops = workshops.map((workshop) => ({
-        ...workshop,
-        is_active: activeCodes.includes(workshop.code),
-      }));
+      const nextWorkshops = workshops
+        .filter((workshop) => !isRegistrationStatusWorkshop(workshop) && !isOnsiteStatusWorkshop(workshop))
+        .map((workshop) => ({
+          ...workshop,
+          is_active: activeCodes.includes(workshop.code),
+        }));
 
       const { error } = await supabase.rpc("admin_sync_workshops_catalog", {
         catalog: buildWorkshopCatalogPayload(nextWorkshops),
@@ -363,7 +423,7 @@ export default function AdminPage() {
         throw error;
       }
 
-      setWorkshops(nextWorkshops);
+      setWorkshops((prev) => prev.filter((workshop) => isRegistrationStatusWorkshop(workshop) || nextWorkshops.some((visibleWorkshop) => visibleWorkshop.code === workshop.code)));
       setActiveTopicsInfoMessage("อัปเดตรายการหัวข้อที่เปิดใช้งานแล้ว");
     } catch (error) {
       setActiveTopicsErrorMessage(getErrorMessage(error));
@@ -426,20 +486,124 @@ export default function AdminPage() {
     }
   }
 
-  function handleToggleRegistrationOpen() {
-    setIsRegistrationOpen((prev) => {
-      const next = !prev;
-      window.localStorage.setItem(REGISTRATION_OPEN_KEY, String(next));
-      return next;
-    });
+  async function handleToggleRegistrationOpen() {
+    const next = !isRegistrationOpen;
+    setIsRegistrationOpen(next);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
+      }
+
+      const existingStatusWorkshop = registrationStatusWorkshop ?? workshops.find(isRegistrationStatusWorkshop);
+      if (existingStatusWorkshop?.id) {
+        const { error } = await supabase
+          .from("workshops")
+          .update({
+            code: REGISTRATION_STATUS_WORKSHOP_CODE,
+            title: REGISTRATION_STATUS_WORKSHOP_TITLE,
+            topic_name: REGISTRATION_STATUS_WORKSHOP_NAME,
+            is_active: next,
+          })
+          .eq("id", existingStatusWorkshop.id);
+
+        if (error) {
+          throw error;
+        }
+
+        setRegistrationStatusWorkshop({ ...existingStatusWorkshop, is_active: next });
+      } else {
+        const { data, error } = await supabase.from("workshops").upsert(
+          {
+            code: REGISTRATION_STATUS_WORKSHOP_CODE,
+            title: REGISTRATION_STATUS_WORKSHOP_TITLE,
+            topic_name: REGISTRATION_STATUS_WORKSHOP_NAME,
+            event_date: "2026-01-01",
+            is_active: next,
+          },
+          { onConflict: "code" },
+        ).select("id, code, title, topic_name, event_date, is_active").single();
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          setRegistrationStatusWorkshop({
+            ...data,
+            title: data.title ?? REGISTRATION_STATUS_WORKSHOP_TITLE,
+            topic_name: data.topic_name ?? REGISTRATION_STATUS_WORKSHOP_NAME,
+            event_date: data.event_date ?? "2026-01-01",
+            is_active: Boolean(data.is_active),
+          });
+        }
+      }
+
+    } catch (error) {
+      setIsRegistrationOpen(!next);
+      setGlobalErrorMessage(getErrorMessage(error));
+    }
   }
 
-  function handleToggleOnsiteRegistrationOpen() {
-    setIsOnsiteRegistrationOpen((prev) => {
-      const next = !prev;
-      window.localStorage.setItem("library-ai-lab-onsite-registration-open", String(next));
-      return next;
-    });
+  async function handleToggleOnsiteRegistrationOpen() {
+    const next = !isOnsiteRegistrationOpen;
+    setIsOnsiteRegistrationOpen(next);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
+      }
+
+      const existingStatusWorkshop = onsiteStatusWorkshop ?? workshops.find(isOnsiteStatusWorkshop);
+      if (existingStatusWorkshop?.id) {
+        const { error } = await supabase
+          .from("workshops")
+          .update({
+            code: ONSITE_STATUS_WORKSHOP_CODE,
+            title: ONSITE_STATUS_WORKSHOP_TITLE,
+            topic_name: ONSITE_STATUS_WORKSHOP_NAME,
+            is_active: next,
+          })
+          .eq("id", existingStatusWorkshop.id);
+
+        if (error) {
+          throw error;
+        }
+
+        setOnsiteStatusWorkshop({ ...existingStatusWorkshop, is_active: next });
+      } else {
+        const { data, error } = await supabase.from("workshops").upsert(
+          {
+            code: ONSITE_STATUS_WORKSHOP_CODE,
+            title: ONSITE_STATUS_WORKSHOP_TITLE,
+            topic_name: ONSITE_STATUS_WORKSHOP_NAME,
+            event_date: "2026-01-01",
+            is_active: next,
+          },
+          { onConflict: "code" },
+        ).select("id, code, title, topic_name, event_date, is_active").single();
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          setOnsiteStatusWorkshop({
+            ...data,
+            title: data.title ?? ONSITE_STATUS_WORKSHOP_TITLE,
+            topic_name: data.topic_name ?? ONSITE_STATUS_WORKSHOP_NAME,
+            event_date: data.event_date ?? "2026-01-01",
+            is_active: Boolean(data.is_active),
+          });
+        }
+      }
+
+    } catch (error) {
+      setIsOnsiteRegistrationOpen(!next);
+      setGlobalErrorMessage(getErrorMessage(error));
+    }
   }
 
   function handleLogout() {
@@ -626,22 +790,22 @@ export default function AdminPage() {
                           aria-pressed={isRegistrationOpen}
                           onClick={handleToggleRegistrationOpen}
                           className={[
-                            "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
+                            "focus-ring inline-flex w-28 items-center justify-between rounded-full px-4 py-2 text-sm font-semibold transition",
                             isRegistrationOpen
                               ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
                               : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
                           ].join(" ")}
                         >
                           <span className={[
-                            "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
-                            isRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
+                            "relative h-6 w-11 shrink-0 rounded-full border border-current transition-colors",
+                            isRegistrationOpen ? "bg-emerald-300/25" : "bg-rose-300/25",
                           ].join(" ")}>
                             <span className={[
-                              "h-3.5 w-3.5 rounded-full bg-white shadow-sm transition",
-                              isRegistrationOpen ? "translate-x-0" : "translate-x-0",
+                              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left]",
+                              isRegistrationOpen ? "left-6" : "left-0.5",
                             ].join(" ")}></span>
                           </span>
-                          {isRegistrationOpen ? "ON" : "OFF"}
+                          <span className="w-7 text-right">{isRegistrationOpen ? "ON" : "OFF"}</span>
                         </button>
                       </div>
                       <p className="mt-3 text-sm text-zinc-300">
@@ -660,19 +824,22 @@ export default function AdminPage() {
                           aria-pressed={isOnsiteRegistrationOpen}
                           onClick={handleToggleOnsiteRegistrationOpen}
                           className={[
-                            "focus-ring inline-flex items-center gap-3 rounded-full px-4 py-2 text-sm font-semibold transition",
+                            "focus-ring inline-flex w-28 items-center justify-between rounded-full px-4 py-2 text-sm font-semibold transition",
                             isOnsiteRegistrationOpen
                               ? "border border-emerald-400/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
                               : "border border-rose-400/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30",
                           ].join(" ")}
                         >
                           <span className={[
-                            "inline-flex h-5 w-9 items-center rounded-full border border-current p-0.5",
-                            isOnsiteRegistrationOpen ? "justify-end bg-emerald-300/25" : "justify-start bg-rose-300/25",
+                            "relative h-6 w-11 shrink-0 rounded-full border border-current transition-colors",
+                            isOnsiteRegistrationOpen ? "bg-emerald-300/25" : "bg-rose-300/25",
                           ].join(" ")}>
-                            <span className="h-3.5 w-3.5 rounded-full bg-white shadow-sm transition"></span>
+                            <span className={[
+                              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-[left]",
+                              isOnsiteRegistrationOpen ? "left-6" : "left-0.5",
+                            ].join(" ")}></span>
                           </span>
-                          {isOnsiteRegistrationOpen ? "ON" : "OFF"}
+                          <span className="w-7 text-right">{isOnsiteRegistrationOpen ? "ON" : "OFF"}</span>
                         </button>
                       </div>
                       <p className="mt-3 text-sm text-zinc-300">
@@ -741,7 +908,7 @@ export default function AdminPage() {
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
                         <h2 className="text-2xl font-semibold text-white">จัดการสถานะผู้สมัครต่อหัวข้อ</h2>
-                        <p className="mt-2 text-sm text-zinc-300">สถานะ `Waiting` จะถูกใช้เป็นรายชื่อสำรอง และ `skip` จะไม่ถูกแสดงในหน้า attendees</p>
+                        <p className="mt-2 text-sm text-zinc-300">Onsite คือผู้มีสิทธิ์เข้าอบรม, Waiting คือรายชื่อสำรอง, และ Record คือผู้รับชมบันทึกย้อนหลัง</p>
                       </div>
                       <button
                         type="button"
@@ -769,7 +936,7 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-wrap items-end justify-between gap-4">
-                    <p className="text-sm text-zinc-300">สถานะ `Waiting` จะถูกใช้เป็นรายชื่อสำรอง และ `skip` จะไม่ถูกแสดงในหน้า attendees</p>
+                    <p className="text-sm text-zinc-300">Onsite คือผู้มีสิทธิ์เข้าอบรม, Waiting คือรายชื่อสำรอง, และ Record คือผู้รับชมบันทึกย้อนหลัง</p>
                     <label className="grid gap-2 text-sm text-zinc-200">
                       <span>เลือกหัวข้อ</span>
                       <select value={selectedWorkshopCode} onChange={(event) => setSelectedWorkshopCode(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-3 text-white">
@@ -811,9 +978,9 @@ export default function AdminPage() {
                                   onChange={(event) => handleRegistrantStatusChange(row.registrationId, row.workshopId, event.target.value as TopicStatus)}
                                   className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-2 text-white"
                                 >
-                                  <option value="Participant">Participant</option>
+                                  <option value="Onsite">Onsite</option>
                                   <option value="Waiting">Waiting</option>
-                                  <option value="skip">skip</option>
+                                  <option value="Record">Record</option>
                                 </select>
                               </td>
                             </tr>

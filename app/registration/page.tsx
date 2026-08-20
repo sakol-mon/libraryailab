@@ -8,7 +8,16 @@ import { FormEvent, useEffect, useState } from "react";
 
 import logoImage from "@/image/logo.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { formatWorkshopDate, mergeWorkshopCatalog, type WorkshopRecord } from "@/lib/workshops";
+import {
+  formatWorkshopDate,
+  isOnsiteStatusWorkshop,
+  isRegistrationStatusWorkshop,
+  mergeWorkshopCatalog,
+  ONSITE_STATUS_WORKSHOP_CODE,
+  ONSITE_STATUS_WORKSHOP_NAME,
+  ONSITE_STATUS_WORKSHOP_TITLE,
+  type WorkshopRecord,
+} from "@/lib/workshops";
 
 const navLinks = ["Home", "About", "Speakers", "Schedule", "Registration", "รายชื่อผู้เข้าอบรม", "Contact"];
 
@@ -30,26 +39,12 @@ function navHref(item: string): string {
 
 const strictEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const thaiNameRegex = /^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$/u;
+const thaiTitleRegex = /^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E.\s]+$/u;
 const ONSITE_REGISTRATION_OPEN_KEY = "library-ai-lab-onsite-registration-open";
 type TopicAttendanceMode = "onsite" | "recording";
 
-function isValidThaiName(value: string): boolean {
-  return thaiNameRegex.test(value);
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  if (typeof error === "object" && error !== null && "message" in error) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim().length > 0) {
-      return message;
-    }
-  }
-
-  return "Unable to submit registration";
+function isValidThaiName(value: string, allowPeriods = false): boolean {
+  return (allowPeriods ? thaiTitleRegex : thaiNameRegex).test(value);
 }
 
 export default function RegistrationPage() {
@@ -57,22 +52,14 @@ export default function RegistrationPage() {
   const [scrolled, setScrolled] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [topicAttendanceMode, setTopicAttendanceMode] = useState<Record<string, TopicAttendanceMode>>({});
   const [topicSelectionError, setTopicSelectionError] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [availableWorkshops, setAvailableWorkshops] = useState<WorkshopRecord[]>([]);
   const [isWorkshopLoading, setIsWorkshopLoading] = useState(true);
-  const [isRegistrationOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-
-    const savedRegistrationOpenState = window.localStorage.getItem("library-ai-lab-registration-open");
-    return savedRegistrationOpenState === null ? true : savedRegistrationOpenState === "true";
-  });
-  const [isOnsiteRegistrationOpen] = useState<boolean>(() => {
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
+  const [isOnsiteRegistrationOpen, setIsOnsiteRegistrationOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return true;
     }
@@ -113,14 +100,61 @@ export default function RegistrationPage() {
           return;
         }
 
-        const activeWorkshops = mergeWorkshopCatalog(data).filter((workshop) => workshop.is_active);
+        const hasRegistrationStatusRow = (data ?? []).some((workshop) => isRegistrationStatusWorkshop(workshop));
+        if (!hasRegistrationStatusRow) {
+          const { error: upsertError } = await supabase.from("workshops").upsert(
+            {
+              code: "register-status",
+              title: "ครั้งที่ 0",
+              topic_name: "Register status",
+              event_date: "2026-01-01",
+              is_active: true,
+            },
+            { onConflict: "code" },
+          );
+
+          if (upsertError) {
+            throw upsertError;
+          }
+        }
+
+        const hasOnsiteStatusRow = (data ?? []).some((workshop) => isOnsiteStatusWorkshop(workshop));
+        if (!hasOnsiteStatusRow) {
+          const { error: upsertError } = await supabase.from("workshops").upsert(
+            {
+              code: ONSITE_STATUS_WORKSHOP_CODE,
+              title: ONSITE_STATUS_WORKSHOP_TITLE,
+              topic_name: ONSITE_STATUS_WORKSHOP_NAME,
+              event_date: "2026-01-01",
+              is_active: true,
+            },
+            { onConflict: "code" },
+          );
+
+          if (upsertError) {
+            throw upsertError;
+          }
+        }
+
+        const mergedWorkshops = mergeWorkshopCatalog(data);
+        const registrationStatusWorkshop = mergedWorkshops.find(isRegistrationStatusWorkshop) ?? null;
+        const onsiteStatusWorkshop = mergedWorkshops.find(isOnsiteStatusWorkshop) ?? null;
+        setIsRegistrationOpen(registrationStatusWorkshop ? Boolean(registrationStatusWorkshop.is_active) : true);
+        setIsOnsiteRegistrationOpen(onsiteStatusWorkshop ? Boolean(onsiteStatusWorkshop.is_active) : true);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(ONSITE_REGISTRATION_OPEN_KEY, String(onsiteStatusWorkshop ? Boolean(onsiteStatusWorkshop.is_active) : true));
+        }
+        const activeWorkshops = mergedWorkshops.filter(
+          (workshop) => workshop.is_active && !isRegistrationStatusWorkshop(workshop) && !isOnsiteStatusWorkshop(workshop),
+        );
         setAvailableWorkshops(activeWorkshops);
-      } catch (error) {
+      } catch {
         if (!isActive) {
           return;
         }
 
-        setSubmitError(getErrorMessage(error));
+        setIsRegistrationOpen(true);
+        setIsOnsiteRegistrationOpen(true);
       } finally {
         if (isActive) {
           setIsWorkshopLoading(false);
@@ -161,32 +195,27 @@ export default function RegistrationPage() {
 
     if (!title || !firstName || !lastName) {
       setSubmitted(false);
-      setSubmitError("กรุณากรอก คำนำหน้านาม, ชื่อ, และนามสกุล ให้ครบทุกช่อง");
       return;
     }
 
-    if (!isValidThaiName(title) || !isValidThaiName(firstName) || !isValidThaiName(lastName)) {
+    if (!isValidThaiName(title, true) || !isValidThaiName(firstName) || !isValidThaiName(lastName)) {
       setSubmitted(false);
-      setSubmitError("กรุณากรอก คำนำหน้านาม, ชื่อ, และนามสกุล เป็นภาษาไทยเท่านั้น โดยไม่ใช้ภาษาอังกฤษ ตัวเลข หรืออักขระพิเศษ");
       return;
     }
 
     if (!strictEmailRegex.test(email)) {
       setSubmitted(false);
-      setSubmitError("รูปแบบอีเมลไม่ถูกต้อง ต้องเป็นรูปแบบ name@example.com");
       return;
     }
 
     if ((role === "student" || role === "staff") && !organization) {
       setSubmitted(false);
-      setSubmitError("กรุณาระบุหน่วยงาน/คณะสำหรับนักศึกษาและบุคลากร");
       return;
     }
 
     if (selectedTopicCodes.length === 0) {
       setSubmitted(false);
       setTopicSelectionError("กรุณาเลือกหัวข้อที่สนใจอย่างน้อย 1 รายการ");
-      setSubmitError("กรุณาเลือกหัวข้อที่สนใจอย่างน้อย 1 รายการ");
       return;
     }
 
@@ -194,7 +223,6 @@ export default function RegistrationPage() {
     if (missingAttendanceMode) {
       setSubmitted(false);
       setTopicSelectionError("กรุณาเลือกวิธีเข้าร่วมสำหรับหัวข้อที่สนใจทุกหัวข้อ ก่อนส่งข้อมูลสมัคร");
-      setSubmitError("กรุณาเลือกวิธีเข้าร่วมสำหรับหัวข้อที่สนใจทุกหัวข้อ ก่อนส่งข้อมูลสมัคร");
       return;
     }
 
@@ -202,7 +230,6 @@ export default function RegistrationPage() {
     if (disabledOnsiteTopic) {
       setSubmitted(false);
       setTopicSelectionError("การสมัคร On-site ถูกปิดชั่วคราว กรุณาเลือก รับชมบันทึกการอบรมย้อนหลัง แทน");
-      setSubmitError("การสมัคร On-site ถูกปิดชั่วคราว กรุณาเลือก รับชมบันทึกการอบรมย้อนหลัง แทน");
       return;
     }
 
@@ -211,12 +238,10 @@ export default function RegistrationPage() {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
       setSubmitted(false);
-      setSubmitError("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitError("");
 
     try {
       const { data: workshops, error: workshopsError } = await supabase
@@ -253,7 +278,7 @@ export default function RegistrationPage() {
       const topicRows = workshops.map((workshop) => ({
         registration_id: registrationId,
         workshop_id: workshop.id,
-        status: selectedTopicModes[workshop.code] === "recording" ? "skip" : "Participant",
+        status: selectedTopicModes[workshop.code] === "recording" ? "Record" : "Onsite",
       }));
 
       const { error: topicInsertError } = await supabase.from("registration_topics").insert(topicRows);
@@ -266,9 +291,8 @@ export default function RegistrationPage() {
       setTopicAttendanceMode({});
       setSelectedRole("");
       formElement.reset();
-    } catch (error) {
+    } catch {
       setSubmitted(false);
-      setSubmitError(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -276,7 +300,6 @@ export default function RegistrationPage() {
 
   const handleTopicToggle = (topicId: string, checked: boolean) => {
     setTopicSelectionError("");
-    setSubmitError("");
 
     setSelectedTopics((prev) => {
       if (checked) {
@@ -406,8 +429,8 @@ export default function RegistrationPage() {
                     required
                     className="focus-ring w-full max-w-[140px] rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-zinc-100 placeholder:text-zinc-400"
                     placeholder="เช่น นาย"
-                    pattern="^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$"
-                    title="กรุณากรอกคำนำหน้านามเป็นภาษาไทยเท่านั้น"
+                    pattern="^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E.\s]+$"
+                    title="กรุณากรอกคำนำหน้านามเป็นภาษาไทยและใช้จุด (.) ได้"
                   />
                 </label>
 

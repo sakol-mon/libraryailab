@@ -1,4 +1,4 @@
-export type TopicStatus = "Participant" | "Waiting" | "skip";
+export type TopicStatus = "Onsite" | "Waiting" | "Record";
 
 export type WorkshopRecord = {
   id?: string;
@@ -9,6 +9,38 @@ export type WorkshopRecord = {
   is_active: boolean;
 };
 
+export const REGISTRATION_STATUS_WORKSHOP_CODE = "register-status";
+export const REGISTRATION_STATUS_WORKSHOP_TITLE = "ครั้งที่ 0";
+export const REGISTRATION_STATUS_WORKSHOP_NAME = "Register status";
+
+export const ONSITE_STATUS_WORKSHOP_CODE = "onsite-status";
+export const ONSITE_STATUS_WORKSHOP_TITLE = "ครั้งที่ 0.1";
+export const ONSITE_STATUS_WORKSHOP_NAME = "Onsite status";
+
+export function isRegistrationStatusWorkshop(workshop: Partial<WorkshopRecord> | null | undefined): boolean {
+  if (!workshop) {
+    return false;
+  }
+
+  return (
+    workshop.code === REGISTRATION_STATUS_WORKSHOP_CODE ||
+    workshop.title === REGISTRATION_STATUS_WORKSHOP_TITLE ||
+    workshop.topic_name === REGISTRATION_STATUS_WORKSHOP_NAME
+  );
+}
+
+export function isOnsiteStatusWorkshop(workshop: Partial<WorkshopRecord> | null | undefined): boolean {
+  if (!workshop) {
+    return false;
+  }
+
+  return (
+    workshop.code === ONSITE_STATUS_WORKSHOP_CODE ||
+    workshop.title === ONSITE_STATUS_WORKSHOP_TITLE ||
+    workshop.topic_name === ONSITE_STATUS_WORKSHOP_NAME
+  );
+}
+
 export const DEFAULT_WORKSHOPS: WorkshopRecord[] = [
   { code: "NotebookLM", title: "ครั้งที่ 1", topic_name: "NotebookLM", event_date: "2026-08-19", is_active: true },
   { code: "Claude", title: "ครั้งที่ 2", topic_name: "Claude", event_date: "2026-09-02", is_active: true },
@@ -18,6 +50,20 @@ export const DEFAULT_WORKSHOPS: WorkshopRecord[] = [
   { code: "n8n", title: "ครั้งที่ 6", topic_name: "n8n", event_date: "2026-10-28", is_active: true },
   { code: "Scopus AI", title: "ครั้งที่ 7", topic_name: "Scopus AI & Consensus & Elicit", event_date: "2026-11-11", is_active: true },
   { code: "Data Analysis", title: "ครั้งที่ 8", topic_name: "Data Analysis with AI", event_date: "2026-11-25", is_active: true },
+  {
+    code: REGISTRATION_STATUS_WORKSHOP_CODE,
+    title: REGISTRATION_STATUS_WORKSHOP_TITLE,
+    topic_name: REGISTRATION_STATUS_WORKSHOP_NAME,
+    event_date: "2026-01-01",
+    is_active: true,
+  },
+  {
+    code: ONSITE_STATUS_WORKSHOP_CODE,
+    title: ONSITE_STATUS_WORKSHOP_TITLE,
+    topic_name: ONSITE_STATUS_WORKSHOP_NAME,
+    event_date: "2026-01-01",
+    is_active: true,
+  },
 ];
 
 const thaiMonths = [
