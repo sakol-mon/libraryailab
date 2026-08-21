@@ -34,7 +34,13 @@ import logoImage from "@/image/logo.png";
 import posterImage from "@/image/poster.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { formatWorkshopDate, mergeWorkshopCatalog, type WorkshopRecord } from "@/lib/workshops";
+import {
+  formatWorkshopDate,
+  isOnsiteStatusWorkshop,
+  isRegistrationStatusWorkshop,
+  mergeWorkshopCatalog,
+  type WorkshopRecord,
+} from "@/lib/workshops";
 
 const navLinks = ["Home", "About", "Speakers", "Schedule", "Registration", "รายชื่อผู้เข้าอบรม", "Contact"];
 
@@ -197,6 +203,12 @@ function formatCountdown(now: number): CountdownState {
   };
 }
 
+function getDisplayWorkshops(workshopData: Partial<WorkshopRecord>[] | null | undefined): WorkshopRecord[] {
+  return mergeWorkshopCatalog(workshopData).filter(
+    (workshop) => !isRegistrationStatusWorkshop(workshop) && !isOnsiteStatusWorkshop(workshop),
+  );
+}
+
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -212,7 +224,7 @@ export default function Home() {
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [posterOpen, setPosterOpen] = useState(false);
   const [posterZoom, setPosterZoom] = useState(1);
-  const [workshops, setWorkshops] = useState<WorkshopRecord[]>(mergeWorkshopCatalog(undefined));
+  const [workshops, setWorkshops] = useState<WorkshopRecord[]>(getDisplayWorkshops(undefined));
   const posterViewportRef = useRef<HTMLDivElement | null>(null);
   const pendingPosterFocusRef = useRef<{ x: number; y: number } | null>(null);
   const pendingPosterRestoreRef = useRef(false);
@@ -264,7 +276,7 @@ export default function Home() {
           return;
         }
 
-        setWorkshops(mergeWorkshopCatalog(data));
+        setWorkshops(getDisplayWorkshops(data));
       } catch {
         // Keep fallback workshop catalog if DB is not reachable.
       }
