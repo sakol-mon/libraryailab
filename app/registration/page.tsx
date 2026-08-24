@@ -400,6 +400,11 @@ export default function RegistrationPage() {
             <div>
               <p className="text-sm tracking-[0.2em] text-[#56A6FF]">REGISTRATION FORM</p>
               <h1 className="mt-2 font-(family-name:--font-poppins) text-3xl font-bold text-white sm:text-4xl">แบบฟอร์มรับสมัคร LIBRARY AI LAB</h1>
+              {!isWorkshopLoading && availableWorkshops.length > 0 ? (
+                <p className="mt-2 text-xl font-semibold text-[#56A6FF] sm:text-2xl">
+                  {availableWorkshops.map((workshop) => `${workshop.title} ${workshop.topic_name}`).join(" | ")}
+                </p>
+              ) : null}
               <p className="mt-3 max-w-2xl text-zinc-300">กรอกข้อมูลเพื่อแสดงความประสงค์เข้าร่วมกิจกรรม ข้อมูลจะถูกบันทึกลงระบบเมื่อส่งแบบฟอร์มสำเร็จ</p>
             </div>
             <Link

@@ -8,7 +8,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import logoImage from "@/image/logo.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { formatTopicLabel, mergeWorkshopCatalog, type TopicStatus, type WorkshopRecord } from "@/lib/workshops";
+import {
+  formatTopicLabel,
+  isOnsiteStatusWorkshop,
+  isRegistrationStatusWorkshop,
+  mergeWorkshopCatalog,
+  type TopicStatus,
+  type WorkshopRecord,
+} from "@/lib/workshops";
 
 type Attendee = {
   id: string;
@@ -71,6 +78,7 @@ export default function AttendeesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [searchText, setSearchText] = useState("");
+  const [activeWorkshops, setActiveWorkshops] = useState<WorkshopRecord[]>([]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 18);
@@ -119,7 +127,11 @@ export default function AttendeesPage() {
         }
 
         const mergedWorkshops = mergeWorkshopCatalog(workshopData);
-        const activeWorkshopCodes = new Set(mergedWorkshops.filter((workshop) => workshop.is_active).map((workshop) => workshop.code));
+        const activeWorkshops = mergedWorkshops.filter(
+          (workshop) => workshop.is_active && !isRegistrationStatusWorkshop(workshop) && !isOnsiteStatusWorkshop(workshop),
+        );
+        const activeWorkshopCodes = new Set(activeWorkshops.map((workshop) => workshop.code));
+        setActiveWorkshops(activeWorkshops);
 
         const registrationById = new Map((registrations ?? []).map((registration) => [registration.id, registration]));
         const workshopById = new Map(
@@ -175,6 +187,7 @@ export default function AttendeesPage() {
         }
 
         setAttendees([]);
+        setActiveWorkshops([]);
         setErrorMessage(getErrorMessage(error));
       } finally {
         if (isActive) {
@@ -280,6 +293,11 @@ export default function AttendeesPage() {
               <div className="max-w-3xl">
                 <p className="text-sm tracking-[0.2em] text-[#56A6FF]">ATTENDEES LIST</p>
                 <h1 className="mt-2 font-(family-name:--font-poppins) text-3xl font-bold text-white sm:text-4xl">รายชื่อผู้เข้าอบรม</h1>
+                {!isLoading && activeWorkshops.length > 0 ? (
+                  <p className="mt-2 text-xl font-semibold text-[#56A6FF] sm:text-2xl">
+                    {activeWorkshops.map((workshop) => `${workshop.title} ${workshop.topic_name}`).join(" | ")}
+                  </p>
+                ) : null}
                 <p className="mt-3 text-zinc-300">Onsite แสดงเป็น “{ONSITE_ATTENDANCE_LABEL}” ส่วน Waiting และ Record แสดงเป็น “{RESERVE_RECORDING_LABEL}”</p>
               </div>
 
