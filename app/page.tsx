@@ -31,7 +31,7 @@ import speakerImage2 from "@/image/2.png";
 import speakerImage3 from "@/image/3.png";
 import speakerImage4 from "@/image/4.png";
 import logoImage from "@/image/logo.png";
-import posterImage from "@/image/poster.png";
+import posterImage from "@/image/poster.webp";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
