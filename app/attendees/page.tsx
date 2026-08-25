@@ -71,6 +71,25 @@ function getAttendeeRegistrationLabel(status: TopicStatus): string {
   return status === "Onsite" ? ONSITE_ATTENDANCE_LABEL : RESERVE_RECORDING_LABEL;
 }
 
+// Abbreviate surname to its first letter, splitting name/surname at the last space in the full name.
+function formatAttendeeDisplayName(fullName: string): string {
+  const trimmed = fullName.trim();
+  const lastSpaceIndex = trimmed.lastIndexOf(" ");
+
+  if (lastSpaceIndex === -1) {
+    return trimmed;
+  }
+
+  const namePart = trimmed.slice(0, lastSpaceIndex).trimEnd();
+  const surnamePart = trimmed.slice(lastSpaceIndex + 1).trim();
+
+  if (!surnamePart) {
+    return namePart;
+  }
+
+  return `${namePart} ${surnamePart.charAt(0)}.`;
+}
+
 export default function AttendeesPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -377,7 +396,7 @@ export default function AttendeesPage() {
                           className="border-t border-white/10 text-white hover:bg-white/5"
                         >
                           <td className="px-6 py-4 align-top text-zinc-400">{index + 1}</td>
-                          <td className="px-6 py-4 align-top font-medium">{attendee.full_name}</td>
+                          <td className="px-6 py-4 align-top font-medium">{formatAttendeeDisplayName(attendee.full_name)}</td>
                           <td className="px-6 py-4 align-top text-zinc-200">{attendee.topicLabel}</td>
                         </motion.tr>
                       ))}
