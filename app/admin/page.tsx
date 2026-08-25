@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/supabase/fetchAllRows";
 import {
   formatWorkshopDate,
   isOnsiteStatusWorkshop,
@@ -153,23 +154,26 @@ export default function AdminPage() {
           throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
         }
 
-        const [{ data: initialWorkshopData, error: initialWorkshopError }, { data: registrationData, error: registrationError }, { data: topicData, error: topicError }] =
-          await Promise.all([
-            supabase.from("workshops").select("id, code, title, topic_name, event_date, is_active").order("event_date", { ascending: true }),
-            supabase.rpc("admin_list_registrations_all"),
-            supabase.rpc("admin_list_registration_topics_all"),
-          ]);
+        const [{ data: initialWorkshopData, error: initialWorkshopError }, registrationData, topicData] = await Promise.all([
+          supabase.from("workshops").select("id, code, title, topic_name, event_date, is_active").order("event_date", { ascending: true }),
+          fetchAllRows<RegistrationRow>((from, to) =>
+            supabase
+              .rpc("admin_list_registrations_all")
+              .order("created_at", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, to),
+          ),
+          fetchAllRows<RegistrationTopicRow>((from, to) =>
+            supabase
+              .rpc("admin_list_registration_topics_all")
+              .order("registration_id", { ascending: true })
+              .order("workshop_id", { ascending: true })
+              .range(from, to),
+          ),
+        ]);
 
         if (initialWorkshopError) {
           throw initialWorkshopError;
-        }
-
-        if (registrationError) {
-          throw registrationError;
-        }
-
-        if (topicError) {
-          throw topicError;
         }
 
         if (!isActive) {
@@ -263,10 +267,10 @@ export default function AdminPage() {
 
         setSelectedWorkshopCode((prev) => prev || displayWorkshops[0]?.code || "");
 
-        const registrationById = new Map(((registrationData ?? []) as RegistrationRow[]).map((registration) => [registration.id, registration]));
+        const registrationById = new Map(registrationData.map((registration) => [registration.id, registration]));
         const workshopById = new Map(workshopRows.map((workshop) => [workshop.id, workshop]));
 
-        const rows = ((topicData ?? []) as RegistrationTopicRow[])
+        const rows = topicData
           .map((topicRow) => {
             const registration = registrationById.get(topicRow.registration_id);
             const workshop = workshopById.get(topicRow.workshop_id);

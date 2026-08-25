@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import logoImage from "@/image/logo.png";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/supabase/fetchAllRows";
 import {
   formatTopicLabel,
   isOnsiteStatusWorkshop,
@@ -119,23 +120,25 @@ export default function AttendeesPage() {
           throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
         }
 
-        const [
-          { data: registrations, error: registrationsError },
-          { data: registrationTopics, error: registrationTopicsError },
-          { data: workshopData, error: workshopsError },
-        ] = await Promise.all([
-          supabase.from("registrations").select("id, full_name, created_at").order("created_at", { ascending: true }),
-          supabase.from("registration_topics").select("registration_id, workshop_id, status"),
+        const [registrations, registrationTopics, { data: workshopData, error: workshopsError }] = await Promise.all([
+          fetchAllRows<{ id: string; full_name: string; created_at: string }>((from, to) =>
+            supabase
+              .from("registrations")
+              .select("id, full_name, created_at")
+              .order("created_at", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, to),
+          ),
+          fetchAllRows<{ registration_id: string; workshop_id: string; status: TopicStatus }>((from, to) =>
+            supabase
+              .from("registration_topics")
+              .select("registration_id, workshop_id, status")
+              .order("registration_id", { ascending: true })
+              .order("workshop_id", { ascending: true })
+              .range(from, to),
+          ),
           supabase.from("workshops").select("id, code, topic_name, title, event_date, is_active").order("event_date", { ascending: true }),
         ]);
-
-        if (registrationsError) {
-          throw registrationsError;
-        }
-
-        if (registrationTopicsError) {
-          throw registrationTopicsError;
-        }
 
         if (workshopsError) {
           throw workshopsError;
