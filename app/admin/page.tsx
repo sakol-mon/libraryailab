@@ -32,8 +32,12 @@ type TopicRegistrantRow = {
   workshopCode: string;
   fullName: string;
   email: string;
+  phone: string;
+  organization: string;
+  role: string;
   status: TopicStatus;
   createdAt: string;
+  updatedAt: string;
 };
 
 type RegistrationTopicRow = {
@@ -46,8 +50,24 @@ type RegistrationRow = {
   id: string;
   full_name: string;
   email: string;
+  phone: string;
+  organization: string;
+  role: string;
   created_at: string;
+  updated_at: string;
 };
+
+function csvEscapeField(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+  return value;
+}
+
+function sanitizeCsvFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, "").trim() || "workshop";
+}
 
 type WorkshopCatalogPayload = Pick<WorkshopRecord, "code" | "title" | "topic_name" | "event_date" | "is_active">;
 
@@ -261,8 +281,12 @@ export default function AdminPage() {
               workshopCode: workshop.code,
               fullName: registration.full_name,
               email: registration.email,
+              phone: registration.phone,
+              organization: registration.organization,
+              role: registration.role,
               status: topicRow.status as TopicStatus,
               createdAt: registration.created_at,
+              updatedAt: registration.updated_at,
             };
           })
           .filter((row): row is TopicRegistrantRow => Boolean(row));
@@ -301,6 +325,39 @@ export default function AdminPage() {
         .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()),
     [registrants, selectedWorkshopCode],
   );
+
+  function handleExportRegistrantsCsv() {
+    if (!selectedWorkshop || selectedWorkshopRegistrants.length === 0) {
+      return;
+    }
+
+    const headers = ["id", "full_name", "email", "phone", "organization", "role", "created_at", "updated_at"];
+    const rows = selectedWorkshopRegistrants.map((row) => [
+      row.registrationId,
+      row.fullName,
+      row.email,
+      row.phone,
+      row.organization,
+      row.role,
+      row.createdAt,
+      row.updatedAt,
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((line) => line.map((value) => csvEscapeField(String(value ?? ""))).join(","))
+      .join("\r\n");
+
+    // Prefix with a BOM so Excel renders Thai (UTF-8) text correctly.
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${sanitizeCsvFileName(`${selectedWorkshop.title} ${selectedWorkshop.topic_name}`)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -937,16 +994,26 @@ export default function AdminPage() {
 
                   <div className="flex flex-wrap items-end justify-between gap-4">
                     <p className="text-sm text-zinc-300">Onsite คือผู้มีสิทธิ์เข้าอบรม, Waiting คือรายชื่อสำรอง, และ Record คือผู้รับชมบันทึกย้อนหลัง</p>
-                    <label className="grid gap-2 text-sm text-zinc-200">
-                      <span>เลือกหัวข้อ</span>
-                      <select value={selectedWorkshopCode} onChange={(event) => setSelectedWorkshopCode(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-3 text-white">
-                        {workshops.map((workshop) => (
-                          <option key={workshop.id} value={workshop.code}>
-                            {workshop.title} - {workshop.topic_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="grid gap-2 text-sm text-zinc-200">
+                        <span>เลือกหัวข้อ</span>
+                        <select value={selectedWorkshopCode} onChange={(event) => setSelectedWorkshopCode(event.target.value)} className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-3 text-white">
+                          {workshops.map((workshop) => (
+                            <option key={workshop.id} value={workshop.code}>
+                              {workshop.title} - {workshop.topic_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleExportRegistrantsCsv}
+                        disabled={selectedWorkshopRegistrants.length === 0}
+                        className="focus-ring inline-flex items-center justify-center rounded-full border border-[#43D5FF]/60 bg-[#43D5FF]/15 px-5 py-3 font-semibold text-[#B7ECFF] transition hover:bg-[#43D5FF]/24 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Export CSV
+                      </button>
+                    </div>
                   </div>
 
                   {selectedWorkshop ? (
