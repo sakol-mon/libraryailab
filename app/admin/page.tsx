@@ -135,6 +135,8 @@ export default function AdminPage() {
   const [selectedWorkshopCode, setSelectedWorkshopCode] = useState("");
   const [registrants, setRegistrants] = useState<TopicRegistrantRow[]>([]);
   const [pendingStatusChanges, setPendingStatusChanges] = useState<Record<string, TopicStatus>>({});
+  const [pendingDeletions, setPendingDeletions] = useState<Record<string, boolean>>({});
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
 
   useEffect(() => {
@@ -297,6 +299,7 @@ export default function AdminPage() {
 
         setRegistrants(rows);
         setPendingStatusChanges({});
+        setPendingDeletions({});
       } catch (error) {
         if (!isActive) {
           return;
@@ -329,6 +332,15 @@ export default function AdminPage() {
         .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()),
     [registrants, selectedWorkshopCode],
   );
+
+  const registrantsMarkedForDeletion = useMemo(
+    () => selectedWorkshopRegistrants.filter((row) => pendingDeletions[row.registrationId]),
+    [selectedWorkshopRegistrants, pendingDeletions],
+  );
+
+  useEffect(() => {
+    setPendingDeletions({});
+  }, [selectedWorkshopCode]);
 
   function handleExportRegistrantsCsv() {
     if (!selectedWorkshop || selectedWorkshopRegistrants.length === 0) {
@@ -505,9 +517,84 @@ export default function AdminPage() {
     }));
   }
 
-  async function handleSaveRegistrantStatuses() {
+  function handleRegistrantDeletionToggle(registrationId: string, checked: boolean) {
+    setRegistrantsErrorMessage("");
+    setRegistrantsInfoMessage("");
+    setPendingDeletions((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        next[registrationId] = true;
+      } else {
+        delete next[registrationId];
+      }
+      return next;
+    });
+  }
+
+  async function persistStatusChanges() {
     const entries = Object.entries(pendingStatusChanges);
     if (entries.length === 0) {
+      return;
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
+    }
+
+    const payload = entries.map(([key, status]) => {
+      const [registrationId, workshopId] = key.split("::");
+      return {
+        registration_id: registrationId,
+        workshop_id: workshopId,
+        status,
+      };
+    });
+
+    const { error } = await supabase.rpc("admin_update_registration_topic_statuses", {
+      updates: payload,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    setPendingStatusChanges({});
+  }
+
+  function handleSaveRegistrantStatuses() {
+    if (registrantsMarkedForDeletion.length > 0) {
+      setIsDeleteConfirmOpen(true);
+      return;
+    }
+
+    void runSaveRegistrantStatuses();
+  }
+
+  async function runSaveRegistrantStatuses() {
+    setIsLoading(true);
+    setRegistrantsErrorMessage("");
+    setRegistrantsInfoMessage("");
+
+    try {
+      await persistStatusChanges();
+      setRegistrantsInfoMessage("ปรับปรุงข้อมูลผู้เข้าอบรมเรียบร้อยแล้ว");
+    } catch (error) {
+      setRegistrantsErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function handleCancelDeleteRegistrants() {
+    setIsDeleteConfirmOpen(false);
+  }
+
+  async function handleConfirmDeleteRegistrants() {
+    const deletionIds = registrantsMarkedForDeletion.map((row) => row.registrationId);
+    setIsDeleteConfirmOpen(false);
+
+    if (deletionIds.length === 0) {
       return;
     }
 
@@ -521,25 +608,47 @@ export default function AdminPage() {
         throw new Error("ระบบยังไม่พร้อมใช้งาน: ยังไม่ได้ตั้งค่า Supabase Environment Variables");
       }
 
-      const payload = entries.map(([key, status]) => {
-        const [registrationId, workshopId] = key.split("::");
-        return {
-          registration_id: registrationId,
-          workshop_id: workshopId,
-          status,
-        };
+      const { error: deleteError } = await supabase.rpc("admin_delete_registrations", {
+        ids: deletionIds,
       });
 
-      const { error } = await supabase.rpc("admin_update_registration_topic_statuses", {
-        updates: payload,
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      const deletedIds = new Set(deletionIds);
+      setRegistrants((prev) => prev.filter((row) => !deletedIds.has(row.registrationId)));
+      setPendingDeletions((prev) => {
+        const next = { ...prev };
+        deletedIds.forEach((id) => delete next[id]);
+        return next;
       });
 
-      if (error) {
-        throw error;
+      const remainingStatusEntries = Object.entries(pendingStatusChanges).filter(
+        ([key]) => !deletedIds.has(key.split("::")[0]),
+      );
+
+      if (remainingStatusEntries.length > 0) {
+        const payload = remainingStatusEntries.map(([key, status]) => {
+          const [registrationId, workshopId] = key.split("::");
+          return {
+            registration_id: registrationId,
+            workshop_id: workshopId,
+            status,
+          };
+        });
+
+        const { error: statusError } = await supabase.rpc("admin_update_registration_topic_statuses", {
+          updates: payload,
+        });
+
+        if (statusError) {
+          throw statusError;
+        }
       }
 
       setPendingStatusChanges({});
-      setRegistrantsInfoMessage("ปรับปรุงข้อมูลผู้เข้าอบรมเรียบร้อยแล้ว");
+      setRegistrantsInfoMessage(`ลบผู้สมัคร ${deletionIds.length} รายชื่อ และปรับปรุงข้อมูลเรียบร้อยแล้ว`);
     } catch (error) {
       setRegistrantsErrorMessage(getErrorMessage(error));
     } finally {
@@ -672,6 +781,8 @@ export default function AdminPage() {
     setAdminUser(null);
     setRegistrants([]);
     setPendingStatusChanges({});
+    setPendingDeletions({});
+    setIsDeleteConfirmOpen(false);
     setGlobalInfoMessage("");
     setGlobalErrorMessage("");
     setActiveTopicsErrorMessage("");
@@ -1031,28 +1142,42 @@ export default function AdminPage() {
                           <th className="px-5 py-4 font-semibold">ชื่อผู้สมัคร</th>
                           <th className="px-5 py-4 font-semibold">อีเมล</th>
                           <th className="px-5 py-4 font-semibold">สถานะ</th>
+                          <th className="px-5 py-4 font-semibold">ลบ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {selectedWorkshopRegistrants.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="px-5 py-8 text-center text-zinc-300">ยังไม่มีผู้สมัครในหัวข้อนี้</td>
+                            <td colSpan={4} className="px-5 py-8 text-center text-zinc-300">ยังไม่มีผู้สมัครในหัวข้อนี้</td>
                           </tr>
                         ) : (
                           selectedWorkshopRegistrants.map((row) => (
-                            <tr key={`${row.registrationId}-${row.workshopId}`} className="border-t border-white/10 text-white">
+                            <tr
+                              key={`${row.registrationId}-${row.workshopId}`}
+                              className={["border-t border-white/10 text-white", pendingDeletions[row.registrationId] ? "bg-rose-500/10" : ""].join(" ")}
+                            >
                               <td className="px-5 py-4 font-medium">{row.fullName}</td>
                               <td className="px-5 py-4 text-zinc-300">{row.email}</td>
                               <td className="px-5 py-4">
                                 <select
                                   value={row.status}
                                   onChange={(event) => handleRegistrantStatusChange(row.registrationId, row.workshopId, event.target.value as TopicStatus)}
-                                  className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-2 text-white"
+                                  disabled={Boolean(pendingDeletions[row.registrationId])}
+                                  className="focus-ring rounded-xl border border-white/20 bg-[#0A245D] px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   <option value="Onsite">Onsite</option>
                                   <option value="Waiting">Waiting</option>
                                   <option value="Record">Record</option>
                                 </select>
+                              </td>
+                              <td className="px-5 py-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(pendingDeletions[row.registrationId])}
+                                  onChange={(event) => handleRegistrantDeletionToggle(row.registrationId, event.target.checked)}
+                                  aria-label={`เลือกลบ ${row.fullName}`}
+                                  className="size-5 rounded border-white/30 bg-[#0A245D] accent-rose-500"
+                                />
                               </td>
                             </tr>
                           ))
@@ -1063,10 +1188,13 @@ export default function AdminPage() {
 
                   <div className="mt-5 space-y-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm text-zinc-300">รายการที่ยังไม่บันทึก: {Object.keys(pendingStatusChanges).length}</p>
+                      <p className="text-sm text-zinc-300">
+                        รายการที่ยังไม่บันทึก: {Object.keys(pendingStatusChanges).length}
+                        {registrantsMarkedForDeletion.length > 0 ? ` · เลือกลบ: ${registrantsMarkedForDeletion.length} รายชื่อ` : ""}
+                      </p>
                       <button
                         type="button"
-                        disabled={isLoading || Object.keys(pendingStatusChanges).length === 0}
+                        disabled={isLoading || (Object.keys(pendingStatusChanges).length === 0 && registrantsMarkedForDeletion.length === 0)}
                         onClick={handleSaveRegistrantStatuses}
                         className="focus-ring inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#FF9A3D] to-[#FFC857] px-6 py-3 font-semibold text-[#351A00] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -1078,6 +1206,38 @@ export default function AdminPage() {
                       {registrantsInfoMessage ? <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100">{registrantsInfoMessage}</p> : null}
                     </div>
                   </div>
+
+                  {isDeleteConfirmOpen ? (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" role="dialog" aria-modal="true">
+                      <div className="w-full max-w-md rounded-3xl border border-rose-400/40 bg-[#0A1B4D] p-6 shadow-2xl">
+                        <h3 className="text-xl font-semibold text-white">ยืนยันการลบผู้สมัคร</h3>
+                        <p className="mt-3 text-sm text-zinc-200">
+                          ต้องการลบผู้สมัครทั้งหมด {registrantsMarkedForDeletion.length} รายชื่อออกจากระบบใช่หรือไม่? การลบจะลบข้อมูลผู้สมัครและสถานะการสมัครทุกหัวข้อของบุคคลนั้นอย่างถาวร
+                        </p>
+                        <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-zinc-200">
+                          {registrantsMarkedForDeletion.map((row) => (
+                            <li key={row.registrationId}>{row.fullName}</li>
+                          ))}
+                        </ul>
+                        <div className="mt-5 flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={handleCancelDeleteRegistrants}
+                            className="focus-ring rounded-full border border-white/20 bg-white/10 px-5 py-2.5 font-semibold text-zinc-100 transition hover:border-white/40"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleConfirmDeleteRegistrants()}
+                            className="focus-ring rounded-full bg-rose-500 px-5 py-2.5 font-semibold text-white transition hover:bg-rose-400"
+                          >
+                            OK
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

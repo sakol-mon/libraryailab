@@ -61,6 +61,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 const ONSITE_ATTENDANCE_LABEL = "เข้าร่วมอบรม Onsite";
+const ONSITE_WAITLIST_LABEL = "เข้าร่วมอบรม Onsite(สำรอง)";
 const RESERVE_RECORDING_LABEL = "ผู้มีสิทธิ์ดูบันทึกการอบรมย้อนหลัง";
 const ATTENDEE_STATUS_ORDER: Record<TopicStatus, number> = {
   Onsite: 0,
@@ -69,7 +70,15 @@ const ATTENDEE_STATUS_ORDER: Record<TopicStatus, number> = {
 };
 
 function getAttendeeRegistrationLabel(status: TopicStatus): string {
-  return status === "Onsite" ? ONSITE_ATTENDANCE_LABEL : RESERVE_RECORDING_LABEL;
+  if (status === "Onsite") {
+    return ONSITE_ATTENDANCE_LABEL;
+  }
+
+  if (status === "Waiting") {
+    return ONSITE_WAITLIST_LABEL;
+  }
+
+  return RESERVE_RECORDING_LABEL;
 }
 
 // Abbreviate surname to its first letter, splitting name/surname at the last space in the full name.
@@ -320,7 +329,9 @@ export default function AttendeesPage() {
                     {activeWorkshops.map((workshop) => `${workshop.title} ${workshop.topic_name}`).join(" | ")}
                   </p>
                 ) : null}
-                <p className="mt-3 text-zinc-300">Onsite แสดงเป็น “{ONSITE_ATTENDANCE_LABEL}” ส่วน Waiting และ Record แสดงเป็น “{RESERVE_RECORDING_LABEL}”</p>
+                <p className="mt-3 text-zinc-300">
+                  Onsite แสดงเป็น “{ONSITE_ATTENDANCE_LABEL}” Waiting แสดงเป็น “{ONSITE_WAITLIST_LABEL}” ส่วน Record แสดงเป็น “{RESERVE_RECORDING_LABEL}”
+                </p>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 lg:min-w-[220px]">
