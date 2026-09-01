@@ -347,7 +347,7 @@ export default function AdminPage() {
       return;
     }
 
-    const headers = ["id", "full_name", "email", "phone", "organization", "role", "created_at", "updated_at"];
+    const headers = ["id", "full_name", "email", "phone", "organization", "role", "status", "created_at", "updated_at"];
     const rows = selectedWorkshopRegistrants.map((row) => [
       row.registrationId,
       row.fullName,
@@ -355,6 +355,7 @@ export default function AdminPage() {
       row.phone,
       row.organization,
       row.role,
+      row.status,
       row.createdAt,
       row.updatedAt,
     ]);
