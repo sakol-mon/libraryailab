@@ -30,6 +30,7 @@ import speakerImage1 from "@/image/1.png";
 import speakerImage2 from "@/image/2.png";
 import speakerImage3 from "@/image/3.png";
 import speakerImage4 from "@/image/4.png";
+import geminiImage from "@/image/3_Gemini.webp";
 import logoImage from "@/image/logo.png";
 import posterImage from "@/image/poster.webp";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -187,9 +188,17 @@ function getTimelineItemState(dateStr: string, now: Date): "completed" | "curren
   }
 }
 
-const targetDate = new Date("2026-08-19T09:00:00+07:00");
-function formatCountdown(now: number): CountdownState {
-  const distance = targetDate.getTime() - now;
+function getNextWorkshopDate(workshops: WorkshopRecord[], now: number): Date | null {
+  const upcomingDates = workshops
+    .map((workshop) => parseWorkshopDate(workshop.event_date))
+    .filter((date) => !Number.isNaN(date.getTime()) && date.getTime() > now)
+    .sort((left, right) => left.getTime() - right.getTime());
+
+  return upcomingDates[0] ?? null;
+}
+
+function formatCountdown(targetDate: Date | null, now: number): CountdownState {
+  const distance = targetDate ? targetDate.getTime() - now : 0;
   if (distance <= 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
   }
@@ -238,20 +247,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const initializeId = window.setTimeout(() => {
-      setCountdown(formatCountdown(Date.now()));
+    const updateCountdown = () => {
+      const now = Date.now();
+      setCountdown(formatCountdown(getNextWorkshopDate(workshops, now), now));
       setCountdownLoaded(true);
+    };
+
+    const initializeId = window.setTimeout(() => {
+      updateCountdown();
     }, 0);
 
     const id = window.setInterval(() => {
-      setCountdown(formatCountdown(Date.now()));
+      updateCountdown();
     }, 1000);
 
     return () => {
       window.clearTimeout(initializeId);
       window.clearInterval(id);
     };
-  }, []);
+  }, [workshops]);
 
   useEffect(() => {
     let isActive = true;
@@ -604,6 +618,72 @@ export default function Home() {
                 </span>
               </button>
             </motion.div>
+          </div>
+        </section>
+
+        <section id="registration" className="py-20">
+          <div className="section-shell grid gap-10 lg:grid-cols-2 lg:items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -28 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.7 }}
+              className="glass-card relative p-6 sm:p-8"
+              aria-label="Registration information"
+            >
+              <div className="absolute inset-0 rounded-[24px] bg-gradient-to-br from-[#43D5FF]/10 to-[#2F7CFF]/12" />
+              <Image
+                src={geminiImage}
+                alt="Gemini workshop"
+                width={geminiImage.width}
+                height={geminiImage.height}
+                sizes="(min-width: 1024px) 40vw, 100vw"
+                className="relative z-10 h-auto w-full rounded-2xl object-cover"
+              />
+            </motion.div>
+
+            <motion.article
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.6 }}
+            >
+              <p className="mb-4 text-sm tracking-[0.18em] text-[#56A6FF]">REGISTRATION OPEN</p>
+              <h2 className="font-(family-name:--font-poppins) text-lg font-bold text-white sm:text-[21px]">หัวข้อการอบรม</h2>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-300">
+                เข้าร่วมการอบรม Onsite ณ ห้องอบรมคอมพิวเตอร์ ชั้น 2
+                <br />
+                อาคารหอสมุดและคลังความรู้มหาวิทยาลัยมหิดล (ศาลายา)
+                <br />
+                เวลา 13:00-16:00 น.
+              </p>
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 px-5 py-2 text-base leading-relaxed text-zinc-200 sm:text-lg">
+                <div className="py-4">
+                  <p className="font-semibold text-white">Gemini ผู้ช่วยส่วนตัว</p>
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-zinc-300">
+                    <li>Gems</li>
+                    <li>ผู้ช่วยสรุป Email</li>
+                    <li>ผู้ช่วยตรวจสอบและสร้างนิสัยปฏิทิน</li>
+                  </ul>
+                </div>
+                <div className="border-t border-white/10 py-4 font-semibold text-white">
+                  การวิเคราะห์ข้อมูลแบบ Multimodal <span className="font-normal text-zinc-300">ภาพ เสียง และวิดีโอ</span>
+                </div>
+                <div className="border-t border-white/10 py-4 font-semibold text-white">
+                  การสั่งสร้างสไลด์บน Google Slides
+                </div>
+                <div className="border-t border-white/10 py-4 font-semibold text-white">
+                  การสั่งสร้าง Dashboard
+                </div>
+              </div>
+              <Link
+                href="/registration"
+                className="focus-ring mt-7 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#2F7CFF] to-[#43D5FF] px-7 py-3 font-semibold text-white shadow-[0_0_24px_rgba(67,213,255,0.4)] transition hover:scale-105"
+              >
+                Register Now
+                <ChevronRight className="ml-2 size-5" />
+              </Link>
+            </motion.article>
           </div>
         </section>
 

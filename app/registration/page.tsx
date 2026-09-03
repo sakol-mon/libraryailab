@@ -41,6 +41,8 @@ const strictEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const thaiNameRegex = /^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E\s]+$/u;
 const thaiTitleRegex = /^[\u0E01-\u0E3A\u0E40-\u0E4C\u0E47-\u0E4E.\s]+$/u;
 const ONSITE_REGISTRATION_OPEN_KEY = "library-ai-lab-onsite-registration-open";
+const WORKSHOP_SCHEDULE_DETAILS = "Onsite เวลา 13:00-16:00 น. ณ ห้องอบรมคอมพิวเตอร์ ชั้น 2";
+const WORKSHOP_LOCATION_DETAILS = "อาคารหอสมุดและคลังความรู้มหาวิทยาลัยมหิดล (ศาลายา)";
 type TopicAttendanceMode = "onsite" | "recording";
 
 function isValidThaiName(value: string, allowPeriods = false): boolean {
@@ -559,6 +561,11 @@ export default function RegistrationPage() {
                             <p className="text-xs font-semibold text-[#56A6FF]">{workshop.title}</p>
                             <p className="text-sm font-medium text-zinc-100">{workshop.topic_name}</p>
                             <p className="text-xs text-zinc-400">📅 {formatWorkshopDate(workshop.event_date)}</p>
+                            <p className="mt-1 text-xs font-semibold leading-relaxed text-[#FFE4B5] sm:text-sm">
+                              {WORKSHOP_SCHEDULE_DETAILS}
+                              <br />
+                              {WORKSHOP_LOCATION_DETAILS}
+                            </p>
                           </div>
                         </label>
 
